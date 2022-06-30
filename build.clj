@@ -6,7 +6,7 @@
             [tupelo.misc :as tm]
             [clojure.java.io :as io]))
 
-(def package-name "Sanskrit Dictionary by MB")
+(def package-name "Sanskrit Dictionaries by MB")
 (def lib 'net.clojars.licht1stein/sanskrit-desktop-dict)
 (def main 'sanskrit-desktop-dict.core)
 
