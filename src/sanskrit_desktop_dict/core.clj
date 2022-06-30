@@ -4,10 +4,17 @@
   (:import [javafx.scene.input KeyCode KeyEvent])
   (:gen-class))
 
-(def *state (atom {:settings {:size :normal}
+(def *state (atom {:settings {:size :normal
+                              :history {:max-size 20}}
                    :title "Sanskrit Dictionary by MB"
                    :input {:current ""
                            :history []}}))
+
+(defn history-conj [{:keys [settings input] :as state}  value]
+  (let [new-history (-> (take (-  (-> settings :history :max-size) 1) (:history input))
+                        (conj value))]
+    (assoc-in state [:input :history] new-history)))
+
 
 (defn root [{:keys [input title]}]
   {:fx/type :stage
@@ -45,7 +52,7 @@
   (reset! last-action event)
   (let [value (-> event :fx/event .getTarget .getValue)]
     (swap! *state #(-> %
-                       (update-in [:input :history] conj value)
+                       (history-conj value)
                        (assoc-in [:input :current] value)))))
 
 (comment
