@@ -10,7 +10,8 @@
                  {:git/tag "v0.6.3" :git/sha "9b8e09b"
                   ;; since we're building an app uberjar, we do not
                   ;; need deps-deploy for clojars.org deployment:
-                  :deps/root "slim"}}
+                  :deps/root "slim"}
+                 tupelo/tupelo {:mvn/version "22.05.24g"}}
           :ns-default build}
   :test {:extra-paths ["test"]
          :extra-deps {org.clojure/test.check {:mvn/version "1.1.1"}
