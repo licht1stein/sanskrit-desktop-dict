@@ -10,6 +10,7 @@
            [javafx.scene.web WebView])
   (:gen-class))
 
+(def sample "Benfey Sanskrit-English Dictionary - 1866 नर नर, i. e. नृ + अ, m. 1. A man; pl. Men, Man. 1, 96. 2. The Eternal, the divine imperishable spirit pervading the universe, Man. 1, 10. 3. pl. Cer tain fabulous beings, MBh. 2, 396. 4. A proper name, Bhāg. P. 8, 1, 27. — Cf. Lat. Nero, Neriene.")
 
 (def *state (atom {:settings {:zoom 100
                               :history {:max-size 20}}
@@ -88,60 +89,65 @@
 
 
 (defn stage:main [{:keys [input title status settings] :as state}]
-  {:fx/type :stage
-   :showing true
-   :title title
-   :scene {:fx/type :scene
-           :root {:fx/type :grid-pane
-                  :grid-lines-visible true
-                  :padding 1
-                  :column-constraints [{:fx/type :column-constraints
-                                        :percent-width 100}]
-                  :row-constraints [{:fx/type :row-constraints
-                                     :percent-height 10}
-                                    {:fx/type :row-constraints
-                                     :percent-height 85}
-                                    {:fx/type :row-constraints
-                                     :percent-height 5}]
-                  :children [;; Top row: input, dictionaries, text size
-                             {:fx/type :v-box
-                              :grid-pane/column 0
-                              :grid-pane/row 0
-                              :children [{:fx/type :tool-bar
-                                          :items [(component:word-input-combo (-> input :current :original) (:history input))
-                                                  {:fx/type :separator}
-                                                  {:fx/type :label
-                                                   :text "Dictionaries"}
-                                                  (component:dictionaries-combo state :row 0 :column 1)
-                                                  {:fx/type :separator}
-                                                  {:fx/type :label
-                                                   :text "Font"}
-                                                  {:fx/type :combo-box
-                                                   :value (-> settings :zoom long->perc)
-                                                   :items (map long->perc [90 95 100 105 110 115 120 125 150])
-                                                   :on-action {:event/type ::zoom}}]}]}
+  (let [input? (not= "" (-> input :current :original))
+        zoom (-> settings :zoom)
+        style (css/register ::style
+                            {".root" {:-fx-font-size (str (* zoom 0.01) "em")}})]
+    {:fx/type :stage
+     :showing true
+     :title title
+     :scene {:fx/type :scene
+             :stylesheets [(::css/url style)]
+             :root {:fx/type :grid-pane
+                    :grid-lines-visible true
+                    :padding 1
+                    :column-constraints [{:fx/type :column-constraints
+                                          :percent-width 100}]
+                    :row-constraints [{:fx/type :row-constraints
+                                       :percent-height 10}
+                                      {:fx/type :row-constraints
+                                       :percent-height 85}
+                                      {:fx/type :row-constraints
+                                       :percent-height 5}]
+                    :children [;; Top row: input, dictionaries, text size
+                               {:fx/type :v-box
+                                :grid-pane/column 0
+                                :grid-pane/row 0
+                                :children [{:fx/type :tool-bar
+                                            :items [(component:word-input-combo (-> input :current :original) (:history input))
+                                                    {:fx/type :separator}
+                                                    {:fx/type :label
+                                                     :text "Dictionaries"}
+                                                    (component:dictionaries-combo state :row 0 :column 1)
+                                                    {:fx/type :separator}
+                                                    {:fx/type :label
+                                                     :text "Font"}
+                                                    {:fx/type :combo-box
+                                                     :value (-> settings :zoom long->perc)
+                                                     :items (map long->perc [90 95 100 110 125 150 175 200])
+                                                     :on-action {:event/type ::zoom}}]}]}
 
-                             ;; Middle row: word selector and translation
-                             {:fx/type :grid-pane
-                              :grid-pane/column 0
-                              :grid-pane/row 1
-                              :column-constraints [{:fx/type :column-constraints
-                                                    :percent-width 30} ;; word list
-                                                   {:fx/type :column-constraints
-                                                    :percent-width 70}] ;; translation
-                              :row-constraints [{:fx/type :row-constraints
-                                                 :percent-height 100}]
-                              :children [; word list
-                                         (component:word-list (:history input)
-                                                              :column 0
-                                                              :row 0)
-                                         ;; translation
-                                         (component:translation "Benfey Sanskrit-English Dictionary - 1866 नर नर, i. e. नृ + अ, m. 1. A man; pl. Men, Man. 1, 96. 2. The Eternal, the divine imperishable spirit pervading the universe, Man. 1, 10. 3. pl. Cer tain fabulous beings, MBh. 2, 396. 4. A proper name, Bhāg. P. 8, 1, 27. — Cf. Lat. Nero, Neriene." :column 1 :row 0)]}
+                               ;; Middle row: word selector and translation
+                               {:fx/type :grid-pane
+                                :grid-pane/column 0
+                                :grid-pane/row 1
+                                :column-constraints [{:fx/type :column-constraints
+                                                      :percent-width 30} ;; word list
+                                                     {:fx/type :column-constraints
+                                                      :percent-width 70}] ;; translation
+                                :row-constraints [{:fx/type :row-constraints
+                                                   :percent-height 100}]
+                                :children [; word list
+                                           (component:word-list (:history input)
+                                                                :column 0
+                                                                :row 0)
+                                           ;; translation
+                                           (component:translation (if input? sample "Type and press enter to start searching...") :column 1 :row 0)]}
 
-                             {:fx/type :label
-                              :text (str "History: " (-> input :history str))
-                              :grid-pane/column 0
-                              :grid-pane/row 2}]}}})
+                               {:fx/type :label
+                                :text (str "History: " (-> input :history str))
+                                :grid-pane/column 0
+                                :grid-pane/row 2}]}}}))
 
 (defn new-search! [state word]
   (swap! state #(-> %
