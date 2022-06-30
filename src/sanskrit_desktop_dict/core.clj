@@ -26,11 +26,13 @@
     (assoc-in state [:input :history] new-history)))
 
 
-(defn component:word-input-combo [value items & {:keys [column row]}]
+(defn component:word-input-combo [value items]
   {:fx/type :combo-box
    :editable true
-   :grid-pane/column column
-   :grid-pane/row row
+   :max-width 500
+   :pref-width 350
+   ;; :grid-pane/column column
+   ;; :grid-pane/row row
    :value value
    :items items
    :prompt-text "Type and press Enter"
@@ -38,10 +40,12 @@
    ;; :on-key-pressed {:event/type ::press}
    :on-action {:event/type ::action}})
 
-(defn component:dictionaries-combo [state]
+(defn component:dictionaries-combo [state & {:keys [row column]}]
   {:fx/type :combo-box
-   :grid-pane/column 1
-   :grid-pane/row 0
+   :max-width 600
+   :pref-width 500
+   ;; :grid-pane/column column
+   ;; :grid-pane/row row
    :items ["afdaf dafasav" "de"]})
 
 (def ext-with-html
@@ -89,27 +93,22 @@
                                     {:fx/type :row-constraints
                                      :percent-height 5}]
                   :children [;; Top row: input, dictionaries, text size
-                             {:fx/type :grid-pane
+                             {:fx/type :v-box
                               :grid-pane/column 0
                               :grid-pane/row 0
-                              :column-constraints [{:fx/type :column-constraints
-                                                    :percent-width 40} ; input
-                                                   {:fx/type :column-constraints
-                                                    :percent-width 50} ; dictionaries
-                                                   {:fx/type :column-constraints
-                                                    :percent-width 10} ; text size
-                                                   ]
-                              :row-constraints [{:fx/type :row-constraints
-                                                 :percent-height 100}]
-                              :children [(component:word-input-combo (-> input :current :original) (:history input) :column 0 :row 0)
-                                         {:fx/type :label
-                                          :text "dictionaries"
-                                          :grid-pane/column 1
-                                          :grid-pane/row 0}
-                                         {:fx/type :label
-                                          :text "text size"
-                                          :grid-pane/column 2
-                                          :grid-pane/row 0}]}
+                              :children [{:fx/type :tool-bar
+                                          :items [(component:word-input-combo (-> input :current :original) (:history input))
+                                                  {:fx/type :separator}
+                                                  {:fx/type :label
+                                                   :text "Dictionaries"}
+                                                  (component:dictionaries-combo state :row 0 :column 1)
+                                                  {:fx/type :separator}
+                                                  {:fx/type :label
+                                                   :text "Font"}
+                                                  {:fx/type :button
+                                                   :text "+"}
+                                                  {:fx/type :button
+                                                   :text "-"}]}]}
 
                              ;; Middle row: word selector and translation
                              {:fx/type :grid-pane
