@@ -59,9 +59,9 @@
   (-> @last-action :fx/event .getTarget .getValue))
 
 
-
-(fx/mount-renderer
- *state
- (fx/create-renderer
-  :middleware (fx/wrap-map-desc assoc :fx/type root)
-  :opts {:fx.opt/map-event-handler event-handler}))
+(defn -main [& args]
+  (fx/mount-renderer
+   *state
+   (fx/create-renderer
+    :middleware (fx/wrap-map-desc assoc :fx/type root)
+    :opts {:fx.opt/map-event-handler event-handler})))

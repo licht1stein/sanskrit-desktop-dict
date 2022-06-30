@@ -2,9 +2,9 @@
  :deps {org.clojure/clojure {:mvn/version "1.11.1"}
         cljfx/cljfx {:mvn/version "1.7.20"}}
  :aliases
- {:run-m {:main-opts ["-m" "licht1stein.sanskrit-desktop-dict"]}
-  :run-x {:ns-default licht1stein.sanskrit-desktop-dict
-          :exec-fn greet
+ {:run-m {:main-opts ["-m" "sanskrit-desktop-dict.core"]}
+  :run-x {:ns-default sanskrit-desktop-dict.core
+          :exec-fn -main
           :exec-args {:name "Clojure"}}
   :build {:deps {io.github.seancorfield/build-clj
                  {:git/tag "v0.6.3" :git/sha "9b8e09b"
