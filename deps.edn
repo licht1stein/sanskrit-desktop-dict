@@ -3,7 +3,8 @@
         cljfx/cljfx {:mvn/version "1.7.20"}
         org.clojure/core.cache {:mvn/version "1.0.225"}
         cljfx/css {:mvn/version "1.1.0"}
-        hiccup/hiccup {:mvn/version "1.0.5"}}
+        hiccup/hiccup {:mvn/version "1.0.5"}
+        com.taoensso/timbre {:mvn/version "5.2.1"}}
  :aliases
  {:run-m {:main-opts ["-m" "sanskrit-desktop-dict.core"]}
   :run-x {:ns-default sanskrit-desktop-dict.core
