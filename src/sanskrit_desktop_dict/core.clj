@@ -24,7 +24,7 @@
     (spit settings-file settings)))
 
 (defn load-settings []
-  (timbre/info ::load-settings :start)
+  (timbre/debug ::load-settings :start)
   (let [settings-dir (str (System/getProperty "user.home") "/.sanskrit-dict")
         settings-file (str settings-dir "/settings.edn")]
     (when-not (.exists (io/file settings-dir))
@@ -81,14 +81,14 @@
 
 (defmethod event-handler ::save-settings [{:keys [fx/context]}]
   (let [settings (-> context :cljfx.context/m :settings)]
-    (timbre/info ::event-handler :save-settings)
+    (timbre/debug ::event-handler :save-settings)
     (save-settings settings)
     {:dispatch {:event/type ::temp-status
                 :value "Settings saved!"
                 :timeout 1}}))
 
 (defmethod event-handler ::temp-status [event]
-  (timbre/info ::temp-status event)
+  (timbre/debug ::temp-status event)
   (swap! *state fx/swap-context assoc-in [:status] (:value event))
   (future
     (Thread/sleep (* 1000 (or (:timeout event) 1)))
@@ -164,14 +164,30 @@
    :items [{:fx/type :button
             :text "btn"}]})
 
+(defn component:zoom-combo [value]
+  {:fx/type :combo-box
+   :value (helpers/long->perc value)
+   :visible-row-count 4
+   :items (map helpers/long->perc [100 125 150 200])
+   :on-value-changed {:event/type ::zoom-change}})
+
+(defn component:statusbar [text & {:keys [row column]}]
+  (cond-> {:fx/type :label
+           :text text}
+    (some? column) (assoc :grid-pane/column column)
+    (some? row) (assoc :grid-pane/row row)))
+
+
 (defn stage:main [{:keys [fx/context]}]
+  (timbre/debug ::stage:main :start)
   (let [title (fx/sub-ctx context sub:title) ;; sample use of sub function
-        input (fx/sub context :input)
-        settings (fx/sub context :settings)
+        input (fx/sub-val context :input)
+        settings (fx/sub-val context :settings)
         input? (not= "" (-> input :current :original))
         zoom (:zoom settings)
-        status (fx/sub context :status)
+        status (fx/sub-val context :status)
         style (css/register ::style {".root" {:-fx-font-size (str (* zoom 0.01) "em")}})]
+    (timbre/debug ::stage:main :loaded-subs {:settings settings})
     {:fx/type :stage
      :showing true
      :title title
@@ -182,12 +198,12 @@
                     :column-constraints [{:fx/type :column-constraints
                                           :percent-width 100}]
                     :row-constraints [{:fx/type :row-constraints
-                                       :percent-height 10}
+                                       :percent-height 10} ;; toolbar row
                                       {:fx/type :row-constraints
-                                       :percent-height 85}
+                                       :percent-height 85} ;; word selector & translation row
                                       {:fx/type :row-constraints
-                                       :percent-height 5}]
-                    :children [;; Top row: input, dictionaries, text size
+                                       :percent-height 5}] ;; status bar row
+                    :children [;; Top row: toolbar (input, dictionaries, zoom)
                                {:fx/type :v-box
                                 :grid-pane/column 0
                                 :grid-pane/row 0
@@ -200,11 +216,7 @@
                                                     {:fx/type :separator}
                                                     {:fx/type :label
                                                      :text "Zoom"}
-                                                    {:fx/type :combo-box
-                                                     :value (helpers/long->perc zoom)
-                                                     :visible-row-count 4
-                                                     :items (map helpers/long->perc [100 125 150 200])
-                                                     :on-value-changed {:event/type ::zoom-change}}]}]}
+                                                    (component:zoom-combo zoom)]}]}
 
                                ;; Middle row: word selector and translation
                                {:fx/type :grid-pane
@@ -225,10 +237,7 @@
                                                                     (str (-> input :current :original) "<br><br>" sample)
                                                                     "Type and press enter to start searching...") :column 1 :row 0)]}
 
-                               {:fx/type :label
-                                :text status
-                                :grid-pane/column 0
-                                :grid-pane/row 2}]}}}))
+                               (component:statusbar status :column 0 :row 2)]}}}))
 
 
 (def renderer
@@ -248,6 +257,8 @@
    *state
    renderer))
 
-(comment
   (-main)
+
+(comment
+
   (renderer))
