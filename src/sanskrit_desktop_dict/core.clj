@@ -4,17 +4,13 @@
             [cljfx.mutator :as fx.mutator]
             [cljfx.lifecycle :as fx.lifecycle]
             [cljfx.css :as css]
-            [clojure.string :as str]
             [clojure.edn :as edn]
-            [clojure.math :as math]
             [clojure.java.io :as io]
             [clojure.core.cache :as cache]
-            [clojure.pprint :refer [pprint]]
             [hiccup.core :refer [html]]
             [taoensso.timbre :as timbre]
             [sanskrit-desktop-dict.helpers :as helpers])
-  (:import [javafx.scene.input KeyCode KeyEvent]
-           [javafx.scene.web WebView])
+  (:import [javafx.scene.web WebView])
   (:gen-class))
 
 (def sample "Benfey Sanskrit-English Dictionary - 1866 नर नर, i. e. नृ + अ, m. 1. A man; pl. Men, Man. 1, 96. 2. The Eternal, the divine imperishable spirit pervading the universe, Man. 1, 10. 3. pl. Cer tain fabulous beings, MBh. 2, 396. 4. A proper name, Bhāg. P. 8, 1, 27. — Cf. Lat. Nero, Neriene.")
@@ -206,16 +202,9 @@
                                                      :text "Zoom"}
                                                     {:fx/type :combo-box
                                                      :value (helpers/long->perc zoom)
+                                                     :visible-row-count 4
                                                      :items (map helpers/long->perc [100 125 150 200])
-                                                     :on-value-changed {:event/type ::zoom-change}}
-                                                    #_{:fx/type :slider
-                                                       :value zoom
-                                                       :min 100
-                                                       :max 200
-                                                       :major-tick-unit 25
-                                                       :block-increment 5
-                                                       :show-tick-marks true
-                                                       :on-value-changed {:event/type ::zoom-change}}]}]}
+                                                     :on-value-changed {:event/type ::zoom-change}}]}]}
 
                                ;; Middle row: word selector and translation
                                {:fx/type :grid-pane
