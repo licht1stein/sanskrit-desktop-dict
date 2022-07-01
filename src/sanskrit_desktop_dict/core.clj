@@ -63,19 +63,24 @@
                         (conj value))]
     (assoc-in state [:input :history] new-history)))
 
-(defn new-search! [state word]
-  (swap! state  fx/swap-context #(-> %
-                                     (history-conj word)
-                                     (assoc-in [:input :current :original] word))))
+(defn new-search! [context word]
+  (-> context
+      (history-conj word)
+      (assoc-in [:input :current :original] word)))
 
 (defmulti event-handler :event/type)
 
-(defmethod event-handler ::word-selected [event & args]
-  (new-search! *state (:fx/event event)))
+(defmethod event-handler ::new-search [{:keys [value fx/context] :as data}]
+  {:context (fx/swap-context context new-search! value)})
+
+(defmethod event-handler ::word-selected [{:keys [fx/event]}]
+  {:dispatch {:event/type ::new-search
+              :value event}})
 
 (defmethod event-handler ::action [event & args]
   (let [value (-> event :fx/event .getTarget .getValue)]
-    (new-search! *state value)))
+    {:dispatch {:event/type ::new-search
+                :value value}}))
 
 (defmethod event-handler ::save-settings [{:keys [fx/context]}]
   (let [settings (-> context :cljfx.context/m :settings)]
@@ -89,13 +94,13 @@
   (timbre/info ::temp-status event)
   (swap! *state fx/swap-context assoc-in [:status] (:value event))
   (future
-    (Thread/sleep (* 1000 (or (:timeout event) 2)))
+    (Thread/sleep (* 1000 (or (:timeout event) 1)))
     (swap! *state fx/swap-context assoc-in [:status] "Ready!")))
 
 
-(defmethod event-handler ::zoom-change [{:keys [fx/event] :as data}]
-  (swap! *state fx/swap-context assoc-in [:settings :zoom] event)
-  {:dispatch {:event/type ::save-settings}})
+(defmethod event-handler ::zoom-change [{:keys [fx/event fx/context]}]
+  {:context (fx/swap-context context assoc-in [:settings :zoom] (math/round event))
+   :dispatch {:event/type ::save-settings}})
 
 
 (def final-event-handler
@@ -243,7 +248,6 @@
                                        ;; For functions in `:fx/type` values, pass
                                        ;; context from option map to these functions
                                        (fx/fn->lifecycle-with-context %))}))
-
 
 (defn -main [& args]
   (fx/mount-renderer
