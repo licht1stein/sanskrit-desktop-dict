@@ -58,7 +58,7 @@
 (defn history-conj [{:keys [settings input] :as state}  value]
   (let [new-history (-> (take (-  (-> settings :history :max-size) 1) (:history input))
                         (conj value))]
-    (assoc-in state [:input :history] new-history)))
+    (assoc-in state [:input :history] (into [] new-history))))
 
 (defn new-search! [context word]
   (-> context
@@ -248,7 +248,6 @@
    *state
    renderer))
 
-(-main)
-
 (comment
+  (-main)
   (renderer))
