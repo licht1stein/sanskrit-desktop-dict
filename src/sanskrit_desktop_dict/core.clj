@@ -11,7 +11,8 @@
             [clojure.core.cache :as cache]
             [clojure.pprint :refer [pprint]]
             [hiccup.core :refer [html]]
-            [taoensso.timbre :as timbre])
+            [taoensso.timbre :as timbre]
+            [sanskrit-desktop-dict.helpers :as helpers])
   (:import [javafx.scene.input KeyCode KeyEvent]
            [javafx.scene.web WebView])
   (:gen-class))
@@ -99,7 +100,7 @@
 
 
 (defmethod event-handler ::zoom-change [{:keys [fx/event fx/context]}]
-  {:context (fx/swap-context context assoc-in [:settings :zoom] (math/round event))
+  {:context (fx/swap-context context assoc-in [:settings :zoom] (helpers/perc->long event))
    :dispatch {:event/type ::save-settings}})
 
 
@@ -203,14 +204,18 @@
                                                     {:fx/type :separator}
                                                     {:fx/type :label
                                                      :text "Zoom"}
-                                                    {:fx/type :slider
-                                                     :value zoom
-                                                     :min 100
-                                                     :max 200
-                                                     :major-tick-unit 25
-                                                     :block-increment 5
-                                                     :show-tick-marks true
-                                                     :on-value-changed {:event/type ::zoom-change}}]}]}
+                                                    {:fx/type :combo-box
+                                                     :value (helpers/long->perc zoom)
+                                                     :items (map helpers/long->perc [100 125 150 200])
+                                                     :on-value-changed {:event/type ::zoom-change}}
+                                                    #_{:fx/type :slider
+                                                       :value zoom
+                                                       :min 100
+                                                       :max 200
+                                                       :major-tick-unit 25
+                                                       :block-increment 5
+                                                       :show-tick-marks true
+                                                       :on-value-changed {:event/type ::zoom-change}}]}]}
 
                                ;; Middle row: word selector and translation
                                {:fx/type :grid-pane
