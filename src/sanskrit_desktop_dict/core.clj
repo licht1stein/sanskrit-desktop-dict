@@ -116,12 +116,11 @@
     (replace-selected-dictionaries context (if event (into #{} (map :code dicts)) #{}))))
 
 (defmethod event-handler ::dictionary-selected:direction [{:keys [fx/event fx/context value]}]
-  (let [parsed-direction (str/split value #" - ")
+  (let [[to from] (str/split value #" - ")
         dicts (-> context :cljfx.context/m :dictionaries :all)
         all-selected (-> context :cljfx.context/m :dictionaries :selected)
-        filtered (filter-dicts (first parsed-direction) (last parsed-direction) dicts)
-        filtered-codes (->> filtered (map :code) (into #{}))]
-    (timbre/debug ::dictionary-selected:direction {:value value :event event :parsed parsed-direction :filtered filtered-codes})
+        filtered-codes (->> dicts (filter-dicts to from) (map :code) (into #{}))]
+    (timbre/debug ::dictionary-selected:direction {:value value :event event})
     (replace-selected-dictionaries context (if event (set/union all-selected filtered-codes) (set/difference all-selected filtered-codes)))))
 
 (defmethod event-handler ::dictionary-selected:code [{:keys [fx/event fx/context value]}]
