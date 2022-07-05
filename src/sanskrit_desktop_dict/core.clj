@@ -19,7 +19,7 @@
 (def sample "Benfey Sanskrit-English Dictionary - 1866 नर नर, i. e. नृ + अ, m. 1. A man; pl. Men, Man. 1, 96. 2. The Eternal, the divine imperishable spirit pervading the universe, Man. 1, 10. 3. pl. Cer tain fabulous beings, MBh. 2, 396. 4. A proper name, Bhāg. P. 8, 1, 27. — Cf. Lat. Nero, Neriene.")
 (def default-settings {:settings {:zoom 100
                                   :history {:max-size 20}}
-                       :dictionaries {:selected #{}}})
+                       :dictionaries {:selected (->> (db/all-dictionaries db/ds) (mapv :code) (into #{}))}})
 
 (defn save-settings [settings]
   (let [settings-dir (str (System/getProperty "user.home") "/.sanskrit-dict")
@@ -123,11 +123,15 @@
   (let [dicts (-> context :cljfx.context/m :dictionaries :all)]
     (replace-selected-dictionaries context (if event (into #{} (map :code dicts)) #{}))))
 
+
 (defmethod event-handler ::dictionary-selected:direction [{:keys [fx/event fx/context value]}]
   (let [[to from] (str/split value #" - ")
         dicts (-> context :cljfx.context/m :dictionaries :all)
+        specialized? (= "Specialized" value)
         all-selected (-> context :cljfx.context/m :dictionaries :selected)
-        filtered-codes (->> dicts (filter-dicts to from) (map :code) (into #{}))]
+        filtered-codes (if-not specialized?
+                         (->> dicts (filter-dicts to from) (map :code) (into #{}))
+                         (->> dicts (filter #(= (:is_special %) 1)) (map :code) (into #{})))]
     (timbre/debug ::dictionary-selected:direction {:value value :event event})
     (replace-selected-dictionaries context (if event (set/union all-selected filtered-codes) (set/difference all-selected filtered-codes)))))
 
@@ -154,20 +158,15 @@
                         :fx/event 166}))
 
 ;; Views
-
-(defn component:word-input-combo [value items disabled? text]
+(defn component:word-input-combo [value items disabled?]
   (cond-> {:fx/type :combo-box
            :editable true
            :max-width 450
            :pref-width 350
-           ;; :grid-pane/column column
-           ;; :grid-pane/row row
            :value value
            :items items
            :disable disabled?
-           :prompt-text text
-           ;; :on-text-changed {:event/type ::type}
-           ;; :on-key-pressed {:event/type ::press}
+           :prompt-text (if-not disabled? "Type and press Enter" "Select at least one dictionary")
            :on-action {:event/type ::action}}))
 
 (def ext-with-html
@@ -208,7 +207,9 @@
    :grid-pane/column 0
    :grid-pane/row 0
    :children [{:fx/type :tool-bar
-               :items [(component:word-input-combo (-> input :current :original) (:history input) disable-input? (if-not disable-input? "Type and press Enter" "Select at least one dictionary"))
+               :items [(component:word-input-combo
+                        (-> input :current :original)
+                        (:history input) disable-input?)
                        {:fx/type :separator}
                        {:fx/type :label
                         :text "Zoom"}
@@ -228,18 +229,21 @@
   (let [all-dicts (:all dicts)
         selected-dicts (:selected dicts)
         grouped (group-by :direction all-dicts)
-        check-box (fn [text selected? event-type on-selected]
-                    {:fx/type :check-box
-                     :padding 5
-                     :text text
-                     :selected selected?
-                     :on-selected-changed {:event/type event-type
-                                           :value on-selected}})]
+        check-box (fn [text selected? event-type on-selected & {:keys [style-class]}]
+                    (cond->
+                     {:fx/type :check-box
+                      :padding 5
+                      :text text
+                      :selected selected?
+                      :on-selected-changed {:event/type event-type
+                                            :value on-selected}}
+                      (some? style-class) (assoc :style-class style-class)))]
     (->>
      (for [[direction dictionaries] grouped]
        (into [{:fx/type :separator :padding 5}
-              {:fx/type :label :text direction :padding 5}
-              (check-box (str "All " direction) (every-selected? selected-dicts dictionaries) ::dictionary-selected:direction direction)]
+              {:fx/type :label :text direction :padding 5 :style-class "dictionaries-label"}
+              (check-box (str "All " direction)
+                         (every-selected? selected-dicts dictionaries) ::dictionary-selected:direction direction)]
              (for [d dictionaries]
                (check-box (:name d) (some? (selected-dicts (:code d))) ::dictionary-selected:code (:code d)))))
      flatten
@@ -252,6 +256,7 @@
 
 (defn components:dictionaries-checkboxes [dicts & {:keys [row column]}]
   (cond-> {:fx/type :v-box
+           :style-class "dictionaries"
            :children (components:dictionaries-checkboxes:children dicts)}
     (some? column) (assoc :grid-pane/column column)
     (some? row) (assoc :grid-pane/row 0)))
@@ -289,6 +294,14 @@
                        :content {:fx/type :scroll-pane
                                  :content (components:dictionaries-checkboxes dicts)}}]}]})
 
+(defn generate-style [settings]
+  (let [zoom (:zoom settings)]
+    {".root" {:-fx-font-size (str (* zoom 0.01) "em")}
+     ".dictionaries" {:-fx-background-color :white
+                      "-label" {:-fx-font-weight :bolder
+                                :-fx-font-size (str (* 1.1 zoom 0.01) "em")
+                                :-fx-text-fill :black}}}))
+
 
 (defn stage:main [{:keys [fx/context]}]
   (timbre/debug ::stage:main)
@@ -300,7 +313,7 @@
         zoom (:zoom settings)
         dicts (fx/sub-val context :dictionaries)
         status (fx/sub-val context :status)
-        style (css/register ::style {".root" {:-fx-font-size (str (* zoom 0.01) "em")}})]
+        style (css/register ::style (generate-style settings))]
     (timbre/debug ::stage:main :loaded-subs {:settings settings})
     {:fx/type :stage
      :showing true
