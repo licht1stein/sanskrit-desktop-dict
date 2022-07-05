@@ -52,6 +52,11 @@
        (query! ds)
        (mapv assoc-direction)))
 
+(defn filter-dicts
+  "Takes a list of dicts and filters them by direction"
+  [to from dicts]
+  (filter #(and (= (:lfrom %) to) (= (:lto %) from) (= (:is_special %) 0)) dicts))
+
 (comment
   (def d (all-dictionaries ds))
   (assoc-direction (last d))

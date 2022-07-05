@@ -123,11 +123,6 @@
   {:context (fx/swap-context context assoc-in [:settings :zoom] (helpers/perc->long event))
    :dispatch {:event/type ::save-settings}})
 
-(defn filter-dicts
-  "Takes a list of dicts and filters them by direction"
-  [to from dicts]
-  (filter #(and (= (:lfrom %) to) (= (:lto %) from) (= (:is_special %) 0)) dicts))
-
 (defn replace-selected-dictionaries [context new-value]
   {:context (fx/swap-context context assoc-in [:dictionaries :selected] new-value)
    :dispatch {:event/type ::save-settings}})
@@ -146,7 +141,7 @@
         specialized? (= "Specialized" value)
         all-selected (-> context :cljfx.context/m :dictionaries :selected)
         filtered-codes (if-not specialized?
-                         (->> dicts (filter-dicts to from) (map :code) (into #{}))
+                         (->> dicts (db/filter-dicts to from) (map :code) (into #{}))
                          (->> dicts (filter #(= (:is_special %) 1)) (map :code) (into #{})))]
     (timbre/debug ::dictionary-selected:direction {:value value :event event})
     (replace-selected-dictionaries context (if event (set/union all-selected filtered-codes) (set/difference all-selected filtered-codes)))))
@@ -192,20 +187,11 @@
            (fx.mutator/setter #(.loadContent (.getEngine ^WebView %1) %2))
            fx.lifecycle/scalar)}))
 
-(comment
-  (defn format-normal [t]
-  (let [mapped (->> (for [[dir trans] (:normal (group-translation t))]
-                      {(str "<b>" (first dir) " -> " (last dir) "</b>")
-                       (for [[d-name articles] trans]
-                         (str "\n\n📖\n<b>" d-name "</b>\n" (str/join "\n\n* * *\n\n" (map :article articles))))})
-                    (reduce merge))]
-    (str/join "" (for [[direction trans] mapped]
-                   (str (str/upper-case direction) (str/join trans) "\n\n"))))))
-
-(defn component:html [html & {:keys [row column]}]
+(defn component:html [html & {:keys [row column zoom]}]
   (cond-> {:fx/type ext-with-html
            :props {:html html}
-           :desc {:fx/type :web-view}}
+           :desc {:fx/type :web-view
+                  :zoom (if zoom (/ zoom 100) 1.0)}}
     (some? column) (assoc :grid-pane/column column)
     (some? row) (assoc :grid-pane/row row)))
 
@@ -216,12 +202,11 @@
    [:h2.word  (:word article)]
    [:p.article-text (#(str/replace (:article article) #"\n" "<br>"))]])
 
-(defn translation-style [& {:keys [zoom]}]
-  (let [font-size (zoom->em (or zoom 100))]
-    (-> [[:body {:font-size font-size}]
-         [:h2 {:color :red :font-size font-size}]
-         [:.article-text {:font-size font-size}]]
-        css)))
+(defn translation-style [& {:keys []}]
+  (-> [[:body {}]
+       [:h2 {:color :red}]
+       [:.article-text {}]]
+      css))
 
 (comment
   (-> (zoom->em 100) keyword)
@@ -234,7 +219,7 @@
         final-html [:html [:head [:meta {:charset "UTF-8"}] [:style style]] [:body translations-html]]]
     (-> final-html
         html
-        component:html)))
+        (component:html :zoom zoom))))
 
 (comment
   (def sample (db/lookup db/ds "nara" :dict ["mw"]))
@@ -352,8 +337,8 @@
                        :closable false
                        :content (cond
                                   (not-empty translation) (component:translations-html translation :settings settings)
-                                  (= "" translation) (component:html "Type and press enter to start searching...")
-                                  (empty? translation) (component:html "Nothing found. Try other dictionaries."))}
+                                  (= "" translation) (component:html "Type and press enter to start searching..." :zoom (:zoom settings))
+                                  (empty? translation) (component:html "Nothing found. Try other dictionaries.") :zoom (:zoom settings))}
                       {:fx/type :tab
                        :id "dictionaries"
                        :graphic {:fx/type :label :text "Dictionaries"}
