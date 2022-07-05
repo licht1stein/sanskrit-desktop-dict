@@ -126,7 +126,7 @@
 (defn filter-dicts
   "Takes a list of dicts and filters them by direction"
   [to from dicts]
-  (filter #(and (= (:lfrom %) to) (= (:lto %) from)) dicts))
+  (filter #(and (= (:lfrom %) to) (= (:lto %) from) (= (:is_special %) 0)) dicts))
 
 (defn replace-selected-dictionaries [context new-value]
   {:context (fx/swap-context context assoc-in [:dictionaries :selected] new-value)
