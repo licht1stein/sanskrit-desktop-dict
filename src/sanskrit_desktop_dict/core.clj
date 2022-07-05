@@ -17,7 +17,7 @@
   (:import [javafx.scene.web WebView])
   (:gen-class))
 
-(def sample "Benfey Sanskrit-English Dictionary - 1866 नर नर, i. e. नृ + अ, m. 1. A man; pl. Men, Man. 1, 96. 2. The Eternal, the divine imperishable spirit pervading the universe, Man. 1, 10. 3. pl. Cer tain fabulous beings, MBh. 2, 396. 4. A proper name, Bhāg. P. 8, 1, 27. — Cf. Lat. Nero, Neriene.")
+(def font (io/resource "fonts/TiroDevanagariSanskrit-Regular.ttf"))
 
 (def default-settings {:settings {:zoom 100
                                   :history {:max-size 20}}
@@ -42,6 +42,7 @@
 
 (comment
   (load-settings))
+
 
 
 (def *state
@@ -191,7 +192,8 @@
   (cond-> {:fx/type ext-with-html
            :props {:html html}
            :desc {:fx/type :web-view
-                  :zoom (if zoom (/ zoom 100) 1.0)}}
+                  :style-class "translation"
+                  :font-scale (if zoom (/ zoom 100) 1.0)}}
     (some? column) (assoc :grid-pane/column column)
     (some? row) (assoc :grid-pane/row row)))
 
