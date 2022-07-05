@@ -166,6 +166,7 @@
            :value value
            :items items
            :disable disabled?
+           :style-class "input"
            :prompt-text (if-not disabled? "Type and press Enter" "Select at least one dictionary")
            :on-action {:event/type ::action}}))
 
@@ -297,6 +298,7 @@
 (defn generate-style [settings]
   (let [zoom (:zoom settings)]
     {".root" {:-fx-font-size (str (* zoom 0.01) "em")}
+     ".input" {:-fx-font-weight :bolder}
      ".dictionaries" {:-fx-background-color :white
                       "-label" {:-fx-font-weight :bolder
                                 :-fx-font-size (str (* 1.1 zoom 0.01) "em")
