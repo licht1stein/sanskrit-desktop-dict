@@ -283,7 +283,8 @@
                       {:fx/type :tab
                        :text "Dictionaries"
                        :closable false
-                       :content (components:dictionaries-checkboxes dicts)}]}]})
+                       :content {:fx/type :scroll-pane
+                                 :content (components:dictionaries-checkboxes dicts)}}]}]})
 
 
 (defn stage:main [{:keys [fx/context]}]
