@@ -2,6 +2,7 @@
   (:require [next.jdbc :as jdbc]
             [next.jdbc.result-set :as rs]
             [clojure.string :as str]
+            [clojure.core.memoize :as memo]
             [honey.sql :as sql]
             [taoensso.timbre :as timbre]
             [sanskrit-desktop-dict.helpers :as helpers]))
@@ -96,7 +97,7 @@
 (defn lookup
   ([ds word]
    (lookup ds word {}))
-  ([ds word {:keys [fav? all? dict lang]}]
+  ([ds word & {:keys [fav? all? dict lang]}]
    (->> {:select [:word/word :article/article :dictionary/code :dictionary/name :dictionary/is_special [:lang-from/name :lfrom] [:lang-to/name :lto]]
          :from :word
          :left-join [:article_word [:= :word.id :article_word.word_id]
@@ -114,7 +115,16 @@
                  (when lang [:= :lang-to.code lang])]}
         (query! ds))))
 
+(def ext-lookup (partial lookup ds))
+
+(def memoized-lookup
+  (memo/lru
+   ext-lookup
+   {} :lru/threshold 256))
+
 (comment
+  (memoized-lookup ds "nara")
+  (memoized-lookup ds "nara" {:dict ["ap90" "mw"]})
   (lookup ds "nara" {:dict ["ap90" "mw"]}))
 
 (defn group-translation
