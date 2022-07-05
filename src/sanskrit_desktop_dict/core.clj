@@ -10,6 +10,7 @@
             [clojure.java.io :as io]
             [clojure.core.cache :as cache]
             [hiccup.core :refer [html]]
+            [garden.core :refer [css]]
             [taoensso.timbre :as timbre]
             [sanskrit-desktop-dict.db.core :as db]
             [sanskrit-desktop-dict.helpers :as helpers])
@@ -17,6 +18,7 @@
   (:gen-class))
 
 (def sample "Benfey Sanskrit-English Dictionary - 1866 नर नर, i. e. नृ + अ, m. 1. A man; pl. Men, Man. 1, 96. 2. The Eternal, the divine imperishable spirit pervading the universe, Man. 1, 10. 3. pl. Cer tain fabulous beings, MBh. 2, 396. 4. A proper name, Bhāg. P. 8, 1, 27. — Cf. Lat. Nero, Neriene.")
+
 (def default-settings {:settings {:zoom 100
                                   :history {:max-size 20}}
                        :dictionaries {:selected (->> (db/all-dictionaries db/ds) (mapv :code) (into #{}))}})
@@ -50,6 +52,7 @@
        :current-view {:translation :translation}
        :title "Sanskrit Dictionaries"
        :status "Ready!"
+       :selected-tab "translation"
        :dictionaries {:all (db/all-dictionaries db/ds)
                       :selected (-> settings :dictionaries :selected)}
        :input {:current {:original ""
@@ -59,9 +62,17 @@
                :history (or (-> settings :input :history) [])}}
       cache/lru-cache-factory))))
 
+(defn zoom->em [zoom & {:keys [modifier]}]
+  (-> (* zoom 0.01)
+      (* (or modifier 1))
+      (str "em")))
+
 ;; Subscription functions
 (defn sub:title [context]
   (fx/sub-val context get-in [:title]))
+
+(defn sub:translation [context]
+  (fx/sub-val context get-in [:input :current :translation]))
 
 
 ;; Event handlers with helpers
@@ -70,16 +81,19 @@
                         (conj value))]
     (assoc-in state [:input :history] (into [] new-history))))
 
-(defn new-search! [context word]
+(defn new-search! [context word translation]
   (-> context
       (history-conj word)
-      (assoc-in [:input :current :original] word)))
+      (assoc-in [:input :current :original] word)
+      (assoc-in [:input :current :translation] translation)))
 
 (defmulti event-handler :event/type)
 
 (defmethod event-handler ::new-search [{:keys [value fx/context] :as data}]
-  {:context (fx/swap-context context new-search! value)
-   :dispatch {:event/type ::save-settings}})
+  (let [selected-dicts (-> context :cljfx.context/m :dictionaries :selected)
+        translation (db/memoized-lookup value :dict selected-dicts)]
+    {:context (fx/swap-context context new-search! value translation)
+     :dispatch {:event/type ::save-settings}}))
 
 (defmethod event-handler ::word-selected [{:keys [fx/event]}]
   {:dispatch {:event/type ::new-search
@@ -105,7 +119,6 @@
     (Thread/sleep (* 1000 (or (:timeout event) 1)))
     (swap! *state fx/swap-context assoc-in [:status] "Ready!")))
 
-
 (defmethod event-handler ::zoom-change [{:keys [fx/event fx/context]}]
   {:context (fx/swap-context context assoc-in [:settings :zoom] (helpers/perc->long event))
    :dispatch {:event/type ::save-settings}})
@@ -119,10 +132,13 @@
   {:context (fx/swap-context context assoc-in [:dictionaries :selected] new-value)
    :dispatch {:event/type ::save-settings}})
 
+(defmethod event-handler ::tab-selected [{:keys [fx/event fx/context value]}]
+  (timbre/debug ::tab-selected {:event event :value value})
+  {:context (fx/swap-context context assoc :selected-tab value)})
+
 (defmethod event-handler ::dicionary-selected:all [{:keys [fx/event fx/context value]}]
   (let [dicts (-> context :cljfx.context/m :dictionaries :all)]
     (replace-selected-dictionaries context (if event (into #{} (map :code dicts)) #{}))))
-
 
 (defmethod event-handler ::dictionary-selected:direction [{:keys [fx/event fx/context value]}]
   (let [[to from] (str/split value #" - ")
@@ -158,6 +174,7 @@
                         :fx/event 166}))
 
 ;; Views
+
 (defn component:word-input-combo [value items disabled?]
   (cond-> {:fx/type :combo-box
            :editable true
@@ -166,7 +183,6 @@
            :value value
            :items items
            :disable disabled?
-           :style-class "input"
            :prompt-text (if-not disabled? "Type and press Enter" "Select at least one dictionary")
            :on-action {:event/type ::action}}))
 
@@ -176,12 +192,54 @@
            (fx.mutator/setter #(.loadContent (.getEngine ^WebView %1) %2))
            fx.lifecycle/scalar)}))
 
-(defn component:translation [html & {:keys [row column]}]
+(comment
+  (defn format-normal [t]
+  (let [mapped (->> (for [[dir trans] (:normal (group-translation t))]
+                      {(str "<b>" (first dir) " -> " (last dir) "</b>")
+                       (for [[d-name articles] trans]
+                         (str "\n\n📖\n<b>" d-name "</b>\n" (str/join "\n\n* * *\n\n" (map :article articles))))})
+                    (reduce merge))]
+    (str/join "" (for [[direction trans] mapped]
+                   (str (str/upper-case direction) (str/join trans) "\n\n"))))))
+
+(defn component:html [html & {:keys [row column]}]
   (cond-> {:fx/type ext-with-html
            :props {:html html}
            :desc {:fx/type :web-view}}
     (some? column) (assoc :grid-pane/column column)
     (some? row) (assoc :grid-pane/row row)))
+
+
+
+(defn format-article [article]
+  [:div.article
+   [:h2.word  (:word article)]
+   [:p.article-text (#(str/replace (:article article) #"\n" "<br>"))]])
+
+(defn translation-style [& {:keys [zoom]}]
+  (let [font-size (zoom->em (or zoom 100))]
+    (-> [[:body {:font-size font-size}]
+         [:h2 {:color :red :font-size font-size}]
+         [:.article-text {:font-size font-size}]]
+        css)))
+
+(comment
+  (-> (zoom->em 100) keyword)
+  (translation-style))
+
+(defn component:translations-html [translations & {:keys [settings]}]
+  (let [zoom (or (:zoom settings) 100)
+        style (translation-style :zoom zoom)
+        translations-html (->> translations (map format-article) (into [:div.all-articles]))
+        final-html [:html [:head [:meta {:charset "UTF-8"}] [:style style]] [:body translations-html]]]
+    (-> final-html
+        html
+        component:html)))
+
+(comment
+  (def sample (db/lookup db/ds "nara" :dict ["mw"]))
+  (format-article (first sample))
+  (component:translations-html sample))
 
 (defn component:word-list [items & {:keys [row column]}]
   {:fx/type :list-view
@@ -194,7 +252,7 @@
   {:fx/type :combo-box
    :value (helpers/long->perc value)
    :visible-row-count 4
-   :items (map helpers/long->perc [100 125 150 200])
+                    :items (map helpers/long->perc [100 125 150 200])
    :on-value-changed {:event/type ::zoom-change}})
 
 (defn component:statusbar [text & {:keys [row column]}]
@@ -203,18 +261,18 @@
     (some? column) (assoc :grid-pane/column column)
     (some? row) (assoc :grid-pane/row row)))
 
-(defn component:top-row [& {:keys [zoom row column input disable-input?]}]
-  {:fx/type :v-box
-   :grid-pane/column 0
-   :grid-pane/row 0
-   :children [{:fx/type :tool-bar
-               :items [(component:word-input-combo
-                        (-> input :current :original)
-                        (:history input) disable-input?)
-                       {:fx/type :separator}
-                       {:fx/type :label
-                        :text "Zoom"}
-                       (component:zoom-combo zoom)]}]})
+(defn component:top-row [& {:keys [zoom input disable-input?]}]
+  (let [history (:history input)
+        current-input (-> input :current :original)]
+    {:fx/type :v-box
+     :grid-pane/column 0
+     :grid-pane/row 0
+     :children [{:fx/type :tool-bar
+                 :items [(component:word-input-combo current-input history disable-input?)
+                         {:fx/type :separator}
+                         {:fx/type :label
+                          :text "Zoom"}
+                         (component:zoom-combo zoom)]}]}))
 
 
 (defn every-selected?
@@ -263,10 +321,10 @@
     (some? row) (assoc :grid-pane/row 0)))
 
 (comment
-  (comp))
+  (-> (db/lookup db/ds "nara" :dict ["mw"]) first))
 
-(defn component:middle-row [& {:keys [input? dicts input row column]}]
-  (timbre/debug ::component:middle-row:translation)
+(defn component:middle-row [& {:keys [dicts input row column translation settings]}]
+  (timbre/debug ::component:middle-row:translation {:translation (count translation)})
   {:fx/type :grid-pane
    :grid-pane/column column
    :grid-pane/row row
@@ -284,32 +342,46 @@
               {:fx/type :tab-pane
                :grid-pane/row 0
                :grid-pane/column 1
+               :side :top
                :tabs [{:fx/type :tab
-                       :text "Translation"
+                       :graphic {:fx/type :label :text "Translation"}
+                       :id "translation"
+
+                       :on-selection-changed {:event/type ::tab-selected
+                                              :value "translation"}
                        :closable false
-                       :content (component:translation (if input? (str (-> input :current :original) "<br><br>" sample)
-                                                           "Type and press enter to start searching..."))}
+                       :content (cond
+                                  (not-empty translation) (component:translations-html translation :settings settings)
+                                  (= "" translation) (component:html "Type and press enter to start searching...")
+                                  (empty? translation) (component:html "Nothing found. Try other dictionaries."))}
                       {:fx/type :tab
-                       :text "Dictionaries"
+                       :id "dictionaries"
+                       :graphic {:fx/type :label :text "Dictionaries"}
+                       :on-selection-changed {:event/type ::tab-selected
+                                              :value "dictionaries"}
                        :closable false
                        :content {:fx/type :scroll-pane
+                                 :style-class "dictionaries"
                                  :content (components:dictionaries-checkboxes dicts)}}]}]})
+
+(comment
+  (zoom->em 1 :modifier 1.1))
 
 (defn generate-style [settings]
   (let [zoom (:zoom settings)]
-    {".root" {:-fx-font-size (str (* zoom 0.01) "em")}
+    {".root" {:-fx-font-size (zoom->em zoom)}
+     ".toolbar" {:-fx-background-color :white}
      ".input" {:-fx-font-weight :bolder}
      ".dictionaries" {:-fx-background-color :white
                       "-label" {:-fx-font-weight :bolder
-                                :-fx-font-size (str (* 1.1 zoom 0.01) "em")
+                                :-fx-font-size (zoom->em zoom :modifier 1.05)
                                 :-fx-text-fill :black}}}))
-
 
 (defn stage:main [{:keys [fx/context]}]
   (timbre/debug ::stage:main)
   (let [title (fx/sub-ctx context sub:title) ;; sample use of sub function
-        current-view (fx/sub-val context :current-view)
         input (fx/sub-val context :input)
+        translation (fx/sub-ctx context sub:translation)
         settings (fx/sub-val context :settings)
         input? (not= "" (-> input :current :original))
         zoom (:zoom settings)
@@ -336,7 +408,7 @@
                                (component:top-row :column 0 :row 0 :zoom zoom :input input :disable-input? (empty? (:selected dicts)))
 
                                ;; Middle row: word selector and translation
-                               (component:middle-row :row 1 :column 0 :input input :input? input? :dicts dicts)
+                               (component:middle-row :row 1 :column 0 :input input :input? input? :dicts dicts :translation translation :settings settings)
 
                                ;; Bottom row
                                (component:statusbar status :column 0 :row 2)]}}}))
