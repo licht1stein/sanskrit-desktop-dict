@@ -17,8 +17,9 @@
   (:gen-class))
 
 (def sample "Benfey Sanskrit-English Dictionary - 1866 नर नर, i. e. नृ + अ, m. 1. A man; pl. Men, Man. 1, 96. 2. The Eternal, the divine imperishable spirit pervading the universe, Man. 1, 10. 3. pl. Cer tain fabulous beings, MBh. 2, 396. 4. A proper name, Bhāg. P. 8, 1, 27. — Cf. Lat. Nero, Neriene.")
-(def default-settings {:zoom 100
-                       :history {:max-size 20}})
+(def default-settings {:settings {:zoom 100
+                                  :history {:max-size 20}}
+                       :dictionaries {:selected #{}}})
 
 (defn save-settings [settings]
   (let [settings-dir (str (System/getProperty "user.home") "/.sanskrit-dict")
@@ -37,21 +38,26 @@
       (spit settings-file default-settings))
     (-> settings-file slurp edn/read-string)))
 
+(comment
+  (load-settings))
+
+
 (def *state
-  (atom
-   (fx/create-context
-    {:settings (load-settings)
-     :current-view {:translation :translation}
-     :title "Sanskrit Dictionaries"
-     :status "Ready!"
-     :dictionaries {:all (db/all-dictionaries db/ds)
-                    :selected #{}}
-     :input {:current {:original ""
-                       :transliteration ""
-                       :translation ""
-                       :dictionaries []}
-             :history []}}
-    cache/lru-cache-factory)))
+  (let [settings (load-settings)]
+    (atom
+     (fx/create-context
+      {:settings (:settings settings)
+       :current-view {:translation :translation}
+       :title "Sanskrit Dictionaries"
+       :status "Ready!"
+       :dictionaries {:all (db/all-dictionaries db/ds)
+                      :selected (-> settings :dictionaries :selected)}
+       :input {:current {:original ""
+                         :transliteration ""
+                         :translation ""
+                         :dictionaries []}
+               :history []}}
+      cache/lru-cache-factory))))
 
 ;; Subscription functions
 (defn sub:title [context]
@@ -84,12 +90,10 @@
                 :value value}}))
 
 (defmethod event-handler ::save-settings [{:keys [fx/context]}]
-  (let [settings (-> context :cljfx.context/m :settings)]
+  (let [settings {:settings (-> context :cljfx.context/m :settings)
+                  :dictionaries {:selected (-> context :cljfx.context/m :dictionaries :selected)}}]
     (timbre/debug ::event-handler :save-settings)
-    (save-settings settings)
-    {:dispatch {:event/type ::temp-status
-                :value "Settings saved!"
-                :timeout 1}}))
+    (save-settings settings)))
 
 (defmethod event-handler ::temp-status [event]
   (timbre/debug ::temp-status event)
@@ -109,7 +113,8 @@
   (filter #(and (= (:lfrom %) to) (= (:lto %) from)) dicts))
 
 (defn replace-selected-dictionaries [context new-value]
-  {:context (fx/swap-context context assoc-in [:dictionaries :selected] new-value)})
+  {:context (fx/swap-context context assoc-in [:dictionaries :selected] new-value)
+   :dispatch {:event/type ::save-settings}})
 
 (defmethod event-handler ::dicionary-selected:all [{:keys [fx/event fx/context value]}]
   (let [dicts (-> context :cljfx.context/m :dictionaries :all)]
@@ -147,19 +152,20 @@
 
 ;; Views
 
-(defn component:word-input-combo [value items]
-  {:fx/type :combo-box
-   :editable true
-   :max-width 450
-   :pref-width 350
-   ;; :grid-pane/column column
-   ;; :grid-pane/row row
-   :value value
-   :items items
-   :prompt-text "Type and press Enter"
-   ;; :on-text-changed {:event/type ::type}
-   ;; :on-key-pressed {:event/type ::press}
-   :on-action {:event/type ::action}})
+(defn component:word-input-combo [value items disabled? text]
+  (cond-> {:fx/type :combo-box
+           :editable true
+           :max-width 450
+           :pref-width 350
+           ;; :grid-pane/column column
+           ;; :grid-pane/row row
+           :value value
+           :items items
+           :disable disabled?
+           :prompt-text text
+           ;; :on-text-changed {:event/type ::type}
+           ;; :on-key-pressed {:event/type ::press}
+           :on-action {:event/type ::action}}))
 
 (def ext-with-html
   (fx/make-ext-with-props
@@ -194,12 +200,12 @@
     (some? column) (assoc :grid-pane/column column)
     (some? row) (assoc :grid-pane/row row)))
 
-(defn component:top-row [& {:keys [zoom row column input]}]
+(defn component:top-row [& {:keys [zoom row column input disable-input?]}]
   {:fx/type :v-box
    :grid-pane/column 0
    :grid-pane/row 0
    :children [{:fx/type :tool-bar
-               :items [(component:word-input-combo (-> input :current :original) (:history input))
+               :items [(component:word-input-combo (-> input :current :original) (:history input) disable-input? (if-not disable-input? "Type and press Enter" "Select at least one dictionary"))
                        {:fx/type :separator}
                        {:fx/type :label
                         :text "Zoom"}
@@ -308,7 +314,7 @@
                                       {:fx/type :row-constraints
                                        :percent-height 5}] ;; status bar row
                     :children [;; Top row: toolbar (input, dictionaries, zoom)
-                               (component:top-row :column 0 :row 0 :zoom zoom :input input)
+                               (component:top-row :column 0 :row 0 :zoom zoom :input input :disable-input? (empty? (:selected dicts)))
 
                                ;; Middle row: word selector and translation
                                (component:middle-row :row 1 :column 0 :input input :input? input? :dicts dicts)
