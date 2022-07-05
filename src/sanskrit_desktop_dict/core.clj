@@ -5,6 +5,8 @@
             [cljfx.lifecycle :as fx.lifecycle]
             [cljfx.css :as css]
             [clojure.edn :as edn]
+            [clojure.set :as set]
+            [clojure.string :as str]
             [clojure.java.io :as io]
             [clojure.core.cache :as cache]
             [hiccup.core :refer [html]]
@@ -15,8 +17,8 @@
   (:gen-class))
 
 (def sample "Benfey Sanskrit-English Dictionary - 1866 नर नर, i. e. नृ + अ, m. 1. A man; pl. Men, Man. 1, 96. 2. The Eternal, the divine imperishable spirit pervading the universe, Man. 1, 10. 3. pl. Cer tain fabulous beings, MBh. 2, 396. 4. A proper name, Bhāg. P. 8, 1, 27. — Cf. Lat. Nero, Neriene.")
-`(def default-settings {:zoom 100
-                        :history {:max-size 20}})
+(def default-settings {:zoom 100
+                       :history {:max-size 20}})
 
 (defn save-settings [settings]
   (let [settings-dir (str (System/getProperty "user.home") "/.sanskrit-dict")
@@ -35,7 +37,6 @@
       (spit settings-file default-settings))
     (-> settings-file slurp edn/read-string)))
 
-
 (def *state
   (atom
    (fx/create-context
@@ -43,7 +44,8 @@
      :current-view {:translation :translation}
      :title "Sanskrit Dictionaries"
      :status "Ready!"
-     :dictionaries (db/all-dictionaries db/ds)
+     :dictionaries {:all (db/all-dictionaries db/ds)
+                    :selected #{}}
      :input {:current {:original ""
                        :transliteration ""
                        :translation ""
@@ -68,14 +70,6 @@
       (assoc-in [:input :current :original] word)))
 
 (defmulti event-handler :event/type)
-
-(defmethod event-handler ::toggle-dictionaries [{:keys [fx/event fx/context]}]
-  (timbre/debug ::toggle-dictionaries)
-  (let [mode (-> context :cljfx.context/m :current-view :translation)
-        _ (timbre/debug ::toggle-dictionaries {:old-mode mode})
-        new-mode (if (= mode :translation) :dict-selector :translation)]
-    (timbre/debug ::toggle-dictionaries {:new-mode new-mode})
-    {:context (fx/swap-context context assoc-in [:current-view :translation] new-mode)}))
 
 (defmethod event-handler ::new-search [{:keys [value fx/context] :as data}]
   {:context (fx/swap-context context new-search! value)})
@@ -109,8 +103,35 @@
   {:context (fx/swap-context context assoc-in [:settings :zoom] (helpers/perc->long event))
    :dispatch {:event/type ::save-settings}})
 
-(defmethod event-handler ::dicionary-selected [{:keys [fx/event fx/context]}]
-  (timbre/debug ::dicionary-selected event))
+(defn filter-dicts
+  "Takes a list of dicts and filters them by direction"
+  [to from dicts]
+  (filter #(and (= (:lfrom %) to) (= (:lto %) from)) dicts))
+
+(defn replace-selected-dictionaries [context new-value]
+  {:context (fx/swap-context context assoc-in [:dictionaries :selected] new-value)})
+
+(defmethod event-handler ::dicionary-selected:all [{:keys [fx/event fx/context value]}]
+  (let [dicts (-> context :cljfx.context/m :dictionaries :all)]
+    (replace-selected-dictionaries context (if event (into #{} (map :code dicts)) #{}))))
+
+(defmethod event-handler ::dictionary-selected:direction [{:keys [fx/event fx/context value]}]
+  (let [parsed-direction (str/split value #" - ")
+        dicts (-> context :cljfx.context/m :dictionaries :all)
+        all-selected (-> context :cljfx.context/m :dictionaries :selected)
+        filtered (filter-dicts (first parsed-direction) (last parsed-direction) dicts)
+        filtered-codes (->> filtered (map :code) (into #{}))]
+    (timbre/debug ::dictionary-selected:direction {:value value :event event :parsed parsed-direction :filtered filtered-codes})
+    (replace-selected-dictionaries context (if event (set/union all-selected filtered-codes) (set/difference all-selected filtered-codes)))))
+
+(defmethod event-handler ::dictionary-selected:code [{:keys [fx/event fx/context value]}]
+  (let [all-selected (-> context :cljfx.context/m :dictionaries :selected)]
+    (timbre/debug ::dictionary-selected:code {:event event :value value :all-selected all-selected})
+    (replace-selected-dictionaries context (if event (conj all-selected value) (disj all-selected value)))))
+
+(comment
+  (def s #{1 2 3})
+  (disj s 1))
 
 (def final-event-handler
   (-> event-handler
@@ -174,32 +195,6 @@
     (some? column) (assoc :grid-pane/column column)
     (some? row) (assoc :grid-pane/row row)))
 
-(defn components:dictionaries-checkboxes [dicts & {:keys [row column]}]
-  (cond-> {:fx/type :v-box
-           :children (into [{:fx/type :label
-                             :text "Dictionaries"}] (for [d dicts] {:fx/type :check-box
-                                                                    :text (:name d)}))}
-    (some? column) (assoc :grid-pane/column column)
-    (some? row) (assoc :grid-pane/row 0)))
-
-(defn component:dictionaries-tree [dicts]
-  (let [items (for [d dicts]
-                {:fx/type :tree-cell})]
-    {:fx/type :tree-view
-     :selection-mode :multiple
-     :grid-pane/row 0
-     :grid-pane/column 1
-     :root {:fx/type :tree-item
-            :value "All Dictionaries"
-            :expanded true
-            :children [{:fx/type :tree-item
-                        :expanded true
-                        :value "Sanskrit -> English"
-                        :children [{:fx/type :tree-item
-                                    :value "Apte"}
-                                   {:fx/type :tree-item
-                                    :value "MW"}]}]}}))
-
 (defn component:top-row [& {:keys [zoom row column input]}]
   {:fx/type :v-box
    :grid-pane/column 0
@@ -211,15 +206,60 @@
                         :text "Zoom"}
                        (component:zoom-combo zoom)]}]})
 
-(defn component:middle-row:translation [& {:keys [input? dicts input row column]}]
+
+(defn every-selected?
+  "Takes a set of dictionary codes `selected-dicts` and a list of `dicts` and checks that
+  all of the dictionary codes of the dictionaries are present in the set."
+  [selected-dicts dicts]
+  (let [dicts-codes (->> dicts (map :code) (into #{}))
+        intersection (set/intersection selected-dicts dicts-codes)]
+    (= intersection dicts-codes)))
+
+
+(defn components:dictionaries-checkboxes:children [dicts]
+  (let [all-dicts (:all dicts)
+        selected-dicts (:selected dicts)
+        grouped (group-by :direction all-dicts)
+        check-box (fn [text selected? event-type on-selected]
+                    {:fx/type :check-box
+                     :padding 5
+                     :text text
+                     :selected selected?
+                     :on-selected-changed {:event/type event-type
+                                           :value on-selected}})]
+    (->>
+     (for [[direction dictionaries] grouped]
+       (into [{:fx/type :separator :padding 5}
+              {:fx/type :label :text direction :padding 5}
+              (check-box (str "All " direction) (every-selected? selected-dicts dictionaries) ::dictionary-selected:direction direction)]
+             (for [d dictionaries]
+               (check-box (:name d) (some? (selected-dicts (:code d))) ::dictionary-selected:code (:code d)))))
+     flatten
+     (into [(check-box "All Dictionaries" (= (count all-dicts) (count selected-dicts)) ::dicionary-selected:all "all-dicts")]))))
+
+(comment
+  (def dicts (db/all-dictionaries db/ds))
+  (every? :selected? dicts)
+  (components:dictionaries-checkboxes:children dicts))
+
+(defn components:dictionaries-checkboxes [dicts & {:keys [row column]}]
+  (cond-> {:fx/type :v-box
+           :children (components:dictionaries-checkboxes:children dicts)}
+    (some? column) (assoc :grid-pane/column column)
+    (some? row) (assoc :grid-pane/row 0)))
+
+(comment
+  (comp))
+
+(defn component:middle-row [& {:keys [input? dicts input row column]}]
   (timbre/debug ::component:middle-row:translation)
   {:fx/type :grid-pane
    :grid-pane/column column
    :grid-pane/row row
    :column-constraints [{:fx/type :column-constraints
-                         :percent-width 30} ;; word list
+                         :percent-width 25} ;; word list
                         {:fx/type :column-constraints
-                         :percent-width 70}] ;; translation
+                         :percent-width 75}] ;; translation
    :row-constraints [{:fx/type :row-constraints
                       :percent-height 100}]
    :children [; word list
@@ -272,7 +312,7 @@
                                (component:top-row :column 0 :row 0 :zoom zoom :input input)
 
                                ;; Middle row: word selector and translation
-                               (component:middle-row:translation :row 1 :column 0 :input input :input? input? :dicts dicts)
+                               (component:middle-row :row 1 :column 0 :input input :input? input? :dicts dicts)
 
                                ;; Bottom row
                                (component:statusbar status :column 0 :row 2)]}}}))
