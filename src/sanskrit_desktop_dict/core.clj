@@ -56,7 +56,7 @@
                          :transliteration ""
                          :translation ""
                          :dictionaries []}
-               :history []}}
+               :history (or (-> settings :input :history) [])}}
       cache/lru-cache-factory))))
 
 ;; Subscription functions
@@ -78,7 +78,8 @@
 (defmulti event-handler :event/type)
 
 (defmethod event-handler ::new-search [{:keys [value fx/context] :as data}]
-  {:context (fx/swap-context context new-search! value)})
+  {:context (fx/swap-context context new-search! value)
+   :dispatch {:event/type ::save-settings}})
 
 (defmethod event-handler ::word-selected [{:keys [fx/event]}]
   {:dispatch {:event/type ::new-search
@@ -90,8 +91,10 @@
                 :value value}}))
 
 (defmethod event-handler ::save-settings [{:keys [fx/context]}]
-  (let [settings {:settings (-> context :cljfx.context/m :settings)
-                  :dictionaries {:selected (-> context :cljfx.context/m :dictionaries :selected)}}]
+  (let [state (-> context :cljfx.context/m)
+        settings {:settings (->  state :settings)
+                  :dictionaries {:selected (-> state :dictionaries :selected)}
+                  :input {:history (-> state :input :history)}}]
     (timbre/debug ::event-handler :save-settings)
     (save-settings settings)))
 
