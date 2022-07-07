@@ -4,7 +4,6 @@
             [clojure.string :as str]
             [clojure.core.memoize :as memo]
             [honey.sql :as sql]
-            [taoensso.timbre :as timbre]
             [sanskrit-desktop-dict.helpers :as helpers]))
 
 (def db-uri "jdbc:sqlite::resource:database/dict.db")
@@ -60,7 +59,6 @@
 (comment
   (def d (all-dictionaries ds))
   (assoc-direction (last d))
-  (group-dictionaries d)
   (find-dictionary ds "mw")
   ;; => [{:id 29,
   ;;      :code "mw",
@@ -77,12 +75,27 @@
         :order-by [:word]}
        (query! ds)))
 
-(defn lookup-by-id [ds word-id {:keys [dict]}]
-  (->> {:select :*
-        :from [:article_word]}))
+(defn start-or-ends-with
+  ([word words]
+   (start-or-ends-with 3 word words))
+  ([count-diff word words]
+   (let [deva (helpers/word->deva word)]
+     (->> (filter #(and (< (count %) (+ (count deva) count-diff))
+                        (or (str/starts-with? % deva)
+                            (str/ends-with? % deva))) words)
+          sort))))
+
+(def memoized-starts-or-ends-with
+  (memo/lru
+   #(start-or-ends-with % (->> (all-words ds) (map :word)))
+   {} :lru/threshold 256))
 
 (comment
   (def words (all-words ds))
+  (take 5 words)
+  (count words)
+  (memoized-starts-or-ends-with "नर")
+  (memoized-starts-or-ends-with "raga")
   (find-dictionary ds "ap90")
   (find-language ds nil))
 
@@ -119,6 +132,21 @@
        (query! ds)
        (map assoc-direction)))
 
+(defn group-translations
+  "Takes a list of translations and makes a hierarchical map like:
+  `{direction {dictionary [articles]}}`"
+  [translations]
+  (let [by-direction (->> translations (group-by :direction) sort)]
+    (->> (for [[direction articles] by-direction]
+           {direction (->> articles  (group-by :name) sort (into {}))})
+         (into {}))))
+
+(defn merge-translations
+  "Takes a coll of articles and str/joins the :article keys with \n"
+  [translations]
+  (let [texts (map :article translations)]
+    (str/join "\n\n" texts)))
+
 (def ext-lookup (partial lookup ds))
 
 (def memoized-lookup
@@ -130,33 +158,3 @@
   (memoized-lookup ds "nara")
   (memoized-lookup ds "nara" {:dict ["ap90" "mw"]})
   (lookup ds "nara" {:dict ["ap90" "mw"]}))
-
-(defn group-translation
-  "Takes a translation produced by lookup and groups it first by direction [Sanskrit English], then by the code of dictionary."
-  [t]
-  (let [by-special (group-by :is_special t)
-        normal (by-special 0)
-        special (by-special 1)]
-    {:normal (->> (for [[a b] (group-by (juxt :lfrom :lto) normal)]
-                    [{a (group-by :name b)}])
-                  flatten
-                  (apply merge))
-     :special (group-by :name special)}))
-
-(defn format-normal [t]
-  (let [mapped (->> (for [[dir trans] (:normal (group-translation t))]
-                      {(str "<b>" (first dir) " -> " (last dir) "</b>")
-                       (for [[d-name articles] trans]
-                         (str "\n\n📖\n<b>" d-name "</b>\n" (str/join "\n\n* * *\n\n" (map :article articles))))})
-                    (reduce merge))]
-    (str/join "" (for [[direction trans] mapped]
-                   (str (str/upper-case direction) (str/join trans) "\n\n")))))
-
-(defn format-special [t]
-  (if (:special t)
-    (str "<b>Specialized Dictionaries</b>" (str/join (for [[d-name trans] (:special (group-translation t))]
-                                                       (str "\n\n📖\n<b>" d-name "</b>\n" (str/join "\n\n* * *\n\n" (map :article trans))))))
-    ""))
-
-(defn format-translations [t]
-  (str (format-normal t) "\n\n" (format-special t)))

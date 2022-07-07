@@ -10,7 +10,6 @@
             [clojure.java.io :as io]
             [clojure.core.cache :as cache]
             [taoensso.timbre :as timbre]
-            [yang.lang :as l]
             [sanskrit-desktop-dict.db.core :as db]
             [sanskrit-desktop-dict.helpers :as helpers])
   (:import [javafx.scene.web WebView])
@@ -56,8 +55,9 @@
        :input {:current {:original ""
                          :transliteration ""
                          :translation ""
+                         :similar []
                          :dictionaries []}
-               :history (or (-> settings :input :history) [])}}
+               :history (into #{} (or (-> settings :input :history) []))}}
       cache/lru-cache-factory))))
 
 (defn zoom->% [zoom & {:keys [modifier]}]
@@ -67,23 +67,27 @@
 
 ;; Subscription functions
 (defn sub:title [context]
-  (fx/sub-val context get-in [:title]))
+  (let [word (fx/sub-val context get-in [:input :current :original])
+        title (fx/sub-val context get-in [:title])]
+    (if (= word "")
+      title
+      (str word " | " title))))
 
 (defn sub:translation [context]
   (fx/sub-val context get-in [:input :current :translation]))
-
 
 ;; Event handlers with helpers
 (defn history-conj [{:keys [settings input] :as state}  value]
   (let [new-history (-> (take (-  (-> settings :history :max-size) 1) (:history input))
                         (conj value))]
-    (assoc-in state [:input :history] (into [] new-history))))
+    (assoc-in state [:input :history] (into #{} new-history))))
 
 (defn new-search! [context word translation]
   (-> context
       (history-conj word)
       (assoc-in [:input :current :original] word)
-      (assoc-in [:input :current :translation] translation)))
+      (assoc-in [:input :current :translation] translation)
+      (assoc-in [:input :current :similar] (into [] (db/memoized-starts-or-ends-with word)))))
 
 (defmulti event-handler :event/type)
 
@@ -194,20 +198,6 @@
     (some? column) (assoc :grid-pane/column column)
     (some? row) (assoc :grid-pane/row row)))
 
-(defn group-translations
-  "Takes a list of translations and makes a hierarchical map like:
-  `{direction {dictionary [articles]}}`"
-  [translations]
-  (let [by-direction (->> translations (group-by :direction) sort)]
-    (->> (for [[direction articles] by-direction]
-           {direction (->> articles  (group-by :name) sort (into {}))})
-         (into {}))))
-
-(defn merge-translations
-  "Takes a coll of articles and str/joins the :article keys with \n"
-  [translations]
-  (let [texts (map :article translations)]
-    (str/join "\n\n" texts)))
 
 (defn count-rows [s]
   (let [paragraphs (str/split s #"\n")
@@ -218,7 +208,7 @@
 
 (defn component:translations [translations]
   (timbre/debug ::component:translation)
-  (let [grouped (group-translations translations)
+  (let [grouped (db/group-translations translations)
         children (for [[direction dictionaries] grouped]
                    (into [{:fx/type :label
                            :style-class "translation-direction"
@@ -227,7 +217,7 @@
                             (into [{:fx/type :label
                                     :style-class "translation-dictionary"
                                     :text dict}
-                                   (let [text (merge-translations articles)
+                                   (let [text (db/merge-translations articles)
                                          row-count (count-rows text)]
                                      {:fx/type :text-area
                                       :editable false
@@ -243,9 +233,13 @@
       :children (flatten children)}}))
 
 
-(defn component:word-list [items & {:keys [row column]}]
+(defn component:word-list [items & {:keys [row column selected-item]}]
   {:fx/type :list-view
    :items items
+   :cell-factory {:fx/cell-type :list-cell
+                  :describe (fn [i]
+                              {:text i})}
+   :padding 5
    :grid-pane/column column
    :grid-pane/row row
    :on-selected-item-changed {:event/type ::word-selected}})
@@ -337,7 +331,7 @@
    :row-constraints [{:fx/type :row-constraints
                       :percent-height 100}]
    :children [; word list
-              (component:word-list (:history input)
+              (component:word-list (-> input :current :similar)
                                    :column 0
                                    :row 0)
               ;; translation
