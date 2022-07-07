@@ -100,25 +100,24 @@
   (sample ds "mci"))
 
 (defn lookup
-  ([ds word]
-   (lookup ds word {}))
-  ([ds word & {:keys [fav? all? dict lang]}]
-   (->> {:select [:word/word :article/article :dictionary/code :dictionary/name :dictionary/is_special [:lang-from/name :lfrom] [:lang-to/name :lto]]
-         :from :word
-         :left-join [:article_word [:= :word.id :article_word.word_id]
-                     :article [:= :article.id :article_word.article_id]
-                     :dictionary [:= :dictionary.id :article.dict_id]
-                     [:language :lang-to] [:= :lang-to.id :dictionary.to_language_id]
-                     [:language :lang-from] [:= :lang-from.id :dictionary.from_language_id]]
-         :where [:and [:or [:= :word (str/lower-case word)] [:= :word (helpers/word->deva word)]]
-                 (cond
-                   all? nil
-                   fav? [:= :dictionary.is_favorite true]
-                   (string? dict) [:= :dictionary.code dict]
-                   (seq dict) [:in :dictionary.code dict])
+  [ds word & {:keys [fav? all? dict lang]}]
+  (->> {:select [:word/word :article/article :dictionary/code :dictionary/name :dictionary/is_special [:lang-from/name :lfrom] [:lang-to/name :lto]]
+        :from :word
+        :left-join [:article_word [:= :word.id :article_word.word_id]
+                    :article [:= :article.id :article_word.article_id]
+                    :dictionary [:= :dictionary.id :article.dict_id]
+                    [:language :lang-to] [:= :lang-to.id :dictionary.to_language_id]
+                    [:language :lang-from] [:= :lang-from.id :dictionary.from_language_id]]
+        :where [:and [:or [:= :word (str/lower-case word)] [:= :word (helpers/word->deva word)]]
+                (cond
+                  all? nil
+                  fav? [:= :dictionary.is_favorite true]
+                  (string? dict) [:= :dictionary.code dict]
+                  (seq dict) [:in :dictionary.code dict])
 
-                 (when lang [:= :lang-to.code lang])]}
-        (query! ds))))
+                (when lang [:= :lang-to.code lang])]}
+       (query! ds)
+       (map assoc-direction)))
 
 (def ext-lookup (partial lookup ds))
 

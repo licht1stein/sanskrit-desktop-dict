@@ -9,15 +9,12 @@
             [clojure.string :as str]
             [clojure.java.io :as io]
             [clojure.core.cache :as cache]
-            [hiccup.core :refer [html]]
-            [garden.core :refer [css]]
             [taoensso.timbre :as timbre]
+            [yang.lang :as l]
             [sanskrit-desktop-dict.db.core :as db]
             [sanskrit-desktop-dict.helpers :as helpers])
   (:import [javafx.scene.web WebView])
   (:gen-class))
-
-(def font (io/resource "fonts/TiroDevanagariSanskrit-Regular.ttf"))
 
 (def default-settings {:settings {:zoom 100
                                   :history {:max-size 20}}
@@ -63,10 +60,10 @@
                :history (or (-> settings :input :history) [])}}
       cache/lru-cache-factory))))
 
-(defn zoom->em [zoom & {:keys [modifier]}]
-  (-> (* zoom 0.01)
+(defn zoom->% [zoom & {:keys [modifier]}]
+  (-> zoom
       (* (or modifier 1))
-      (str "em")))
+      (str "%")))
 
 ;; Subscription functions
 (defn sub:title [context]
@@ -100,8 +97,8 @@
   {:dispatch {:event/type ::new-search
               :value event}})
 
-(defmethod event-handler ::action [event & args]
-  (let [value (-> event :fx/event .getTarget .getValue)]
+(defmethod event-handler ::action [{:keys [^javafx.event.ActionEvent fx/event]}]
+  (let [value (-> event .getTarget .getValue)]
     {:dispatch {:event/type ::new-search
                 :value value}}))
 
@@ -188,45 +185,63 @@
            (fx.mutator/setter #(.loadContent (.getEngine ^WebView %1) %2))
            fx.lifecycle/scalar)}))
 
+
 (defn component:html [html & {:keys [row column zoom]}]
   (cond-> {:fx/type ext-with-html
            :props {:html html}
            :desc {:fx/type :web-view
-                  :style-class "translation"
                   :font-scale (if zoom (/ zoom 100) 1.0)}}
     (some? column) (assoc :grid-pane/column column)
     (some? row) (assoc :grid-pane/row row)))
 
+(defn group-translations
+  "Takes a list of translations and makes a hierarchical map like:
+  `{direction {dictionary [articles]}}`"
+  [translations]
+  (let [by-direction (->> translations (group-by :direction) sort)]
+    (->> (for [[direction articles] by-direction]
+           {direction (->> articles  (group-by :name) sort (into {}))})
+         (into {}))))
+
+(defn merge-translations
+  "Takes a coll of articles and str/joins the :article keys with \n"
+  [translations]
+  (let [texts (map :article translations)]
+    (str/join "\n\n" texts)))
+
+(defn count-rows [s]
+  (let [paragraphs (str/split s #"\n")
+        para-count (count paragraphs)
+        long-lines (->> paragraphs (map #(/ (count %) 60)) (filter #(> % 1)) (reduce +) int)]
+    (+ para-count long-lines 1)))
 
 
-(defn format-article [article]
-  [:div.article
-   [:h2.word  (:word article)]
-   [:p.article-text (#(str/replace (:article article) #"\n" "<br>"))]])
+(defn component:translations [translations]
+  (timbre/debug ::component:translation)
+  (let [grouped (group-translations translations)
+        children (for [[direction dictionaries] grouped]
+                   (into [{:fx/type :label
+                           :style-class "translation-direction"
+                           :text direction}
+                          (for [[dict articles] dictionaries]
+                            (into [{:fx/type :label
+                                    :style-class "translation-dictionary"
+                                    :text dict}
+                                   (let [text (merge-translations articles)
+                                         row-count (count-rows text)]
+                                     {:fx/type :text-area
+                                      :editable false
+                                      :wrap-text true
+                                      :pref-column-count 60
+                                      :pref-row-count row-count
+                                      :style-class "translation-article"
+                                      :text text})]))]))]
+    {:fx/type :scroll-pane
+     :style-class "translation"
+     :content
+     {:fx/type :v-box
+      :children (flatten children)}}))
 
-(defn translation-style [& {:keys []}]
-  (-> [[:body {}]
-       [:h2 {:color :red}]
-       [:.article-text {}]]
-      css))
-
-(comment
-  (-> (zoom->em 100) keyword)
-  (translation-style))
-
-(defn component:translations-html [translations & {:keys [settings]}]
-  (let [zoom (or (:zoom settings) 100)
-        style (translation-style :zoom zoom)
-        translations-html (->> translations (map format-article) (into [:div.all-articles]))
-        final-html [:html [:head [:meta {:charset "UTF-8"}] [:style style]] [:body translations-html]]]
-    (-> final-html
-        html
-        (component:html :zoom zoom))))
-
-(comment
-  (def sample (db/lookup db/ds "nara" :dict ["mw"]))
-  (format-article (first sample))
-  (component:translations-html sample))
 
 (defn component:word-list [items & {:keys [row column]}]
   {:fx/type :list-view
@@ -338,8 +353,8 @@
                                               :value "translation"}
                        :closable false
                        :content (cond
-                                  (not-empty translation) (component:translations-html translation :settings settings)
-                                  (= "" translation) (component:html "Type and press enter to start searching..." :zoom (:zoom settings))
+                                  (not-empty translation) (component:translations translation) #_(component:translations-html translation :settings settings)
+                                  (= "" translation) {:fx/type :label :text "Type and press enter to start searching..."}
                                   (empty? translation) (component:html "Nothing found. Try other dictionaries.") :zoom (:zoom settings))}
                       {:fx/type :tab
                        :id "dictionaries"
@@ -352,16 +367,27 @@
                                  :content (components:dictionaries-checkboxes dicts)}}]}]})
 
 (comment
-  (zoom->em 1 :modifier 1.1))
+  (zoom->% 1 :modifier 1.1))
 
 (defn generate-style [settings]
   (let [zoom (:zoom settings)]
-    {".root" {:-fx-font-size (zoom->em zoom)}
+    {".root" {:-fx-font-size (zoom->% zoom)}
      ".toolbar" {:-fx-background-color :white}
      ".input" {:-fx-font-weight :bolder}
+     ".translation" {:-fx-background-color :white
+                     "-direction" {:-fx-font-size (zoom->% zoom :modifier 1.3)
+                                   :-fx-padding [0 0 5 0]}
+                     "-dictionary" {:-fx-font-size (zoom->% zoom :modifier 1.1)
+                                    :-fx-padding [15 0 5 0]}
+                     "-word" {:-fx-font-size (zoom->% zoom :modifier 1.2)
+                              :-fx-font-weight :bolder
+                              :-fx-padding [10 0 10 0]}
+                     "-article" {:-fx-background-color :white
+                                 :-fx-display-caret false
+                                 :.scroll-bar:vertical {:-fx-opacity 0}}}
      ".dictionaries" {:-fx-background-color :white
                       "-label" {:-fx-font-weight :bolder
-                                :-fx-font-size (zoom->em zoom :modifier 1.05)
+                                :-fx-font-size (zoom->% zoom :modifier 1.05)
                                 :-fx-text-fill :black}}}))
 
 (defn stage:main [{:keys [fx/context]}]
