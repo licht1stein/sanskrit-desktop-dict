@@ -2,6 +2,8 @@
 
 A Desktop version of [Cologne Digital Sanskrit Dictionaries](https://www.sanskrit-lexicon.uni-koeln.de/)
 
+![Screenshot 01](/screenshots/01.png)
+
 ## Using the app
 
 You can download latest version from our [Telegram Channel](https://t.me/sanskritdesktop). The `pkg` file is not signed, since this is a very niche non-commercial product. So in order to install it you need to:
