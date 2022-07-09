@@ -21,9 +21,13 @@
 (def app-date (->> app-version :date (.format (java.text.SimpleDateFormat. "MMM dd, yyyy"))))
 (def app-about-text (-> "about.txt" io/resource slurp))
 
+
 (def default-settings {:settings {:zoom 100
                                   :history {:max-size 100}}
                        :dictionaries {:selected (->> (db/all-dictionaries db/ds) (mapv :code) (into #{}))}})
+
+(defn github-version []
+  (-> "https://raw.githubusercontent.com/licht1stein/sanskrit-desktop-dict/master/resources/version.edn" slurp edn/read-string))
 
 (defn save-settings [settings]
   (let [settings-dir (str (System/getProperty "user.home") "/.sanskrit-dict")

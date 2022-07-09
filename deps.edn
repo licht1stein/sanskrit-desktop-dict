@@ -11,10 +11,9 @@
         com.github.sanskrit-coders/indic-transliteration_2.12 {:mvn/version "1.32"}
         org.clojure/core.memoize {:mvn/version "1.0.257"}}
  :aliases
- {:run-m {:main-opts ["-m" "sanskrit-desktop-dict.core"]}
-  :run-x {:ns-default sanskrit-desktop-dict.core
+ {:run-x {:ns-default sanskrit-desktop-dict.core
           :exec-fn -main
-          :exec-args {:name "Clojure"}}
+          :exec-args {}}
   :dev {:extra-paths ["src"]
         :extra-deps {}}
   :build {:deps {io.github.seancorfield/build-clj
