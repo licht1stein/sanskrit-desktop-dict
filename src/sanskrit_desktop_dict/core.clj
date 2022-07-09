@@ -82,19 +82,21 @@
                         (conj value))]
     (assoc-in state [:input :history] (into #{} new-history))))
 
-(defn new-search! [context word translation]
+(defn new-search! [context word translation similar]
   (-> context
       (history-conj word)
       (assoc-in [:input :current :original] word)
       (assoc-in [:input :current :translation] translation)
-      (assoc-in [:input :current :similar] (into [] (db/memoized-starts-or-ends-with word)))))
+      (assoc-in [:input :current :similar] similar)))
 
 (defmulti event-handler :event/type)
 
 (defmethod event-handler ::new-search [{:keys [value fx/context] :as data}]
+  (timbre/debug ::new-search)
   (let [selected-dicts (-> context :cljfx.context/m :dictionaries :selected)
-        translation (db/memoized-lookup value :dict selected-dicts)]
-    {:context (fx/swap-context context new-search! value translation)
+        translation (db/memoized-lookup value :dict selected-dicts)
+        similar (into [] (db/memoized-starts-or-ends-with value))]
+    {:context (fx/swap-context context new-search! value translation similar)
      :dispatch {:event/type ::save-settings}}))
 
 (defmethod event-handler ::word-selected [{:keys [fx/event]}]
@@ -107,11 +109,11 @@
                 :value value}}))
 
 (defmethod event-handler ::save-settings [{:keys [fx/context]}]
+  (timbre/debug ::event-handler :save-settings)
   (let [state (-> context :cljfx.context/m)
         settings {:settings (->  state :settings)
                   :dictionaries {:selected (-> state :dictionaries :selected)}
                   :input {:history (-> state :input :history)}}]
-    (timbre/debug ::event-handler :save-settings)
     (save-settings settings)))
 
 (defmethod event-handler ::temp-status [event]
