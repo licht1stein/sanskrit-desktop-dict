@@ -4,6 +4,10 @@ A Desktop version of [Cologne Digital Sanskrit Dictionaries](https://www.sanskri
 
 ![Screenshot 01](/screenshots/01.png)
 
+Allows searching all 32 dictionaries simultaneously using either devanagari or IAST (the app detects the characters used and does all the transliterations automatically).
+
+The database file is not included in the repo (it's too large).
+
 ## Using the app
 
 You can download latest version from our [Telegram Channel](https://t.me/sanskritdesktop). The `pkg` file is not signed, since this is a very niche non-commercial product. So in order to install it you need to:
