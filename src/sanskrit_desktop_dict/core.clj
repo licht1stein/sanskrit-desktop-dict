@@ -437,8 +437,6 @@
     (timbre/debug ::stage:main :loaded-subs {:settings settings})
     {:fx/type :stage
      :showing true
-     :min-height 768
-     :min-width 1024
      :title title
      :scene {:fx/type :scene
              :stylesheets [(::css/url style)]
@@ -479,8 +477,6 @@
    *state
    renderer))
 
-  (-main)
-
 (comment
-
+  (-main)
   (renderer))

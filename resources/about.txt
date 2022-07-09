@@ -3,4 +3,11 @@ Desktop app that searches Cologne Digital Sanskrit Dictionaries for any word in 
 Author: Mykhaylo Bilyanskyy
 Email: mb@sanskrit.digital
 
-Cologne Digital Sanskrit Dictionaries: https://www.sanskrit-lexicon.uni-koeln.de
+You can follow new version releases, download new versions and discuss the app in our Telegram channel:
+https://t.me/sanskritdesktop
+
+
+This app is just a very humble wrapper to make more convenient use of the Cologne Digital Sanskrit Dictionaries. I cannot even begin to imagine the amount of work it took to produce the actual dictionaries. Thank you for making the dictionaries and for releasing them in such a way that made this app possible.
+
+Cologne Digital Sanskrit Dictionaries:
+https://www.sanskrit-lexicon.uni-koeln.de
