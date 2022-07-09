@@ -51,38 +51,23 @@
       (not= "" (:out res)) (println (:out res))
       (not= "" (:err res)) (println (:err res)))))
 
-(defn package-image [opts]
-  (sh  "jpackage"
-       "--name" package-name
-       "--app-version" (current-version)
-       "--app-image" (str  "./" package-name ".app")))
-
-(defn package-cleanup [opts]
-  (sh-print "mv" "*.dmg" "target/"))
-
-
+;; Manual: https://centerkey.com/mac/java/
 (defn mac "Package the Mac application with jpackage" [opts]
   (let [ver (current-version)
         uberjar (str "sanskrit-desktop-dict-" ver ".jar")
-        uberjar-exists? (.exists (io/file (str "target/" uberjar)))
-        icon-file (io/file "resources/app-icon.icns")
-        icon-exists? (.exists icon-file)]
+        uberjar-exists? (.exists (io/file (str "target/" uberjar)))]
     (when-not uberjar-exists?
       (println  (str "Error: uberjar target/" uberjar " not found. Did you forget to run the ci command?\n\nRun before packaging:\nclj -T:build ci\n"))
       (System/exit 1))
-    (println (str "Packaging target/" uberjar " as image..."))
+    (println (str "Packaging target/" uberjar))
     (sh "jpackage"
         "--name" package-name
-        "--input" "target"
-        "--main-jar" uberjar
+        "--input" "."
+        "--main-jar" (str "target/" uberjar)
         "--app-version" ver
         "--copyright" "Mikhail Beliansky"
-        "--type" "app-image")
-    (println "Replacing icon...")
-    (replace-icon nil)
-    (println "Packaging image...")
-    (package-image nil)
-    (println "Cleaning up...")
-    (sh-print "rm" "-rf" "*.app")
+        "--resource-dir" "resources/package/macos"
+        "--mac-package-identifier" "SanskritDictionariesByMB"
+        "--type" "pkg")
     (println "Moving result to /target")
-    (package-cleanup nil)))
+    (sh-print "mv" "*.pkg" "target/")))
