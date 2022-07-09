@@ -58,7 +58,7 @@
                          :translation ""
                          :similar []
                          :dictionaries []}
-               :history (into #{} (or (-> settings :input :history) []))}}
+               :history (or (-> settings :input :history) [])}}
       cache/lru-cache-factory))))
 
 (defn zoom->% [zoom & {:keys [modifier]}]
@@ -79,9 +79,11 @@
 
 ;; Event handlers with helpers
 (defn history-conj [{:keys [settings input] :as state}  value]
-  (let [new-history (-> (take (-  (-> settings :history :max-size) 1) (:history input))
-                        (conj value))]
-    (assoc-in state [:input :history] (into #{} new-history))))
+  (let [filtered-history (filter (every-pred #(not= (:word %) value) map? #(some? (:word %))) (:history input))
+        new-history (-> (take (-  (-> settings :history :max-size) 1) filtered-history)
+                        (conj {:word value
+                               :ts (quot (System/currentTimeMillis) 1000)}))]
+    (assoc-in state [:input :history] (->> new-history (sort-by :ts) reverse))))
 
 (defn new-search! [context word translation similar]
   (-> context
@@ -174,17 +176,16 @@
                         :fx/event 166}))
 
 ;; Views
-
-(defn component:word-input-combo [value items disabled?]
-  (cond-> {:fx/type :combo-box
-           :editable true
-           :max-width 450
-           :pref-width 350
-           :value value
-           :items items
-           :disable disabled?
-           :prompt-text (if-not disabled? "Type and press Enter" "Select at least one dictionary")
-           :on-action {:event/type ::action}}))
+`(defn component:word-input-combo [value items disabled?]
+   (cond-> {:fx/type :combo-box
+            :editable true
+            :max-width 450
+            :pref-width 350
+            :value value
+            :items (map :word items)
+            :disable disabled?
+            :prompt-text (if-not disabled? "Type and press Enter" "Select at least one dictionary")
+            :on-action {:event/type ::action}}))
 
 (def ext-with-html
   (fx/make-ext-with-props
@@ -353,7 +354,7 @@
               (component:word-list (-> input :current :similar)
                                    :column 0
                                    :row 0
-                                   :selection (-> input :current :original))
+                                   :selection (-> input :current :original helpers/word->deva))
               ;; translation
               {:fx/type :tab-pane
                :grid-pane/row 0
