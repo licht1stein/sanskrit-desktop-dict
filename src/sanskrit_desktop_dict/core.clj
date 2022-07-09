@@ -3,6 +3,7 @@
             [cljfx.prop :as fx.prop]
             [cljfx.mutator :as fx.mutator]
             [cljfx.lifecycle :as fx.lifecycle]
+            [cljfx.ext.list-view :as fx.ext.list-view]
             [cljfx.css :as css]
             [clojure.edn :as edn]
             [clojure.set :as set]
@@ -204,8 +205,8 @@
 (defn count-rows [s]
   (let [paragraphs (str/split s #"\n")
         para-count (count paragraphs)
-        long-lines (->> paragraphs (map #(/ (count %) 60)) (filter #(> % 1)) (reduce +) int)]
-    (+ para-count long-lines 1)))
+        long-lines (->> paragraphs (map #(/ (count %) 100)) (filter #(> % 1)) (reduce +) int)]
+    (+ para-count 1)))
 
 
 (defn component:translations [translations]
@@ -234,23 +235,39 @@
      {:fx/type :v-box
       :children (flatten children)}}))
 
+(defn list-view [{:keys [items selection selection-mode]}]
+  {:fx/type fx.ext.list-view/with-selection-props
+   :props (case selection-mode
+            :multiple {:selection-mode :multiple
+                       :selected-items selection
+                       :on-selected-items-changed {:event/type ::word-selected-multiple}}
+            :single (cond-> {:selection-mode :single
+                             :on-selected-item-changed {:event/type ::word-selected}}
+                      (seq selection)
+                      (assoc :selected-item (-> selection sort first))))
+   :desc {:fx/type :list-view
+          :cell-factory {:fx/cell-type :list-cell
+                         :describe (fn [path]
+                                     {:text path})}
+          :items items}})
 
-(defn component:word-list [items & {:keys [row column selected-item]}]
-  {:fx/type :list-view
+
+(defn component:word-list [items & {:keys [row column selection]}]
+  {:fx/type list-view
    :items items
-   :cell-factory {:fx/cell-type :list-cell
-                  :describe (fn [i]
-                              {:text i})}
-   :padding 5
-   :grid-pane/column column
-   :grid-pane/row row
-   :on-selected-item-changed {:event/type ::word-selected}})
+   :selection-mode :single
+   :selection [selection]
+   ;; :grid-pane/column column
+   ;; :grid-pane/row row
+   ;; :selection (first items)
+   ;; :on-selected-item-changed {:event/type ::word-selected}
+   })
 
 (defn component:zoom-combo [value]
   {:fx/type :combo-box
    :value (helpers/long->perc value)
    :visible-row-count 4
-                    :items (map helpers/long->perc [100 125 150 200])
+   :items (map helpers/long->perc [100 125 150 200])
    :on-value-changed {:event/type ::zoom-change}})
 
 (defn component:statusbar [text & {:keys [row column]}]
@@ -327,15 +344,16 @@
    :grid-pane/column column
    :grid-pane/row row
    :column-constraints [{:fx/type :column-constraints
-                         :percent-width 25} ;; word list
+                         :percent-width 20} ;; word list
                         {:fx/type :column-constraints
-                         :percent-width 75}] ;; translation
+                         :percent-width 80}] ;; translation
    :row-constraints [{:fx/type :row-constraints
                       :percent-height 100}]
    :children [; word list
               (component:word-list (-> input :current :similar)
                                    :column 0
-                                   :row 0)
+                                   :row 0
+                                   :selection (-> input :current :original))
               ;; translation
               {:fx/type :tab-pane
                :grid-pane/row 0
@@ -400,6 +418,8 @@
     (timbre/debug ::stage:main :loaded-subs {:settings settings})
     {:fx/type :stage
      :showing true
+     :min-height 768
+     :min-width 1024
      :title title
      :scene {:fx/type :scene
              :stylesheets [(::css/url style)]
@@ -435,12 +455,14 @@
                                        ;; context from option map to these functions
                                        (fx/fn->lifecycle-with-context %))}))
 
+
 (defn -main [& args]
   (fx/mount-renderer
    *state
    renderer))
 
-  (-main)
+
+(-main)
 
 (comment
 
