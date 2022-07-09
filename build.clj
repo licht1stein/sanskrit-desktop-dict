@@ -39,12 +39,17 @@
                            :minor [major (inc minor) 0]
                            :patch [major minor (inc patch)])
                          (str/join "."))]
+    (->> "README.md"
+         slurp
+         str/split-lines
+         (#(assoc % 1 (str "Latest version: " new-version)))
+         (str/join "\n")
+         (spit "README.md"))
     (->> {:version new-version :date (java.util.Date.)}
          (spit "resources/version.edn"))))
 
-(defn replace-icon [opts]
-  (let [icon-file (io/file "resources/app-icon.icns")]
-    (io/copy icon-file (io/file (str package-name ".app/Contents/Resources/" package-name ".icns")))))
+(comment
+  (slurp "README.md"))
 
 (defn sh-print [& args]
   (let [res (tm/shell-cmd (str/join " " args))]
