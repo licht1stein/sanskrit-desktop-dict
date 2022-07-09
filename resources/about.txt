@@ -1,0 +1,6 @@
+Desktop app that searches Cologne Digital Sanskrit Dictionaries for any word in Devanagari or IAST.
+
+Author: Mykhaylo Bilyanskyy
+Email: mb@sanskrit.digital
+
+Cologne Digital Sanskrit Dictionaries: https://www.sanskrit-lexicon.uni-koeln.de

@@ -16,8 +16,13 @@
   (:import [javafx.scene.web WebView])
   (:gen-class))
 
+(def app-name "Sanskrit Dictionaries by MB")
+(def app-version (-> "version.edn" io/resource slurp edn/read-string))
+(def app-date (->> app-version :date (.format (java.text.SimpleDateFormat. "MMM dd, yyyy"))))
+(def app-about-text (-> "about.txt" io/resource slurp))
+
 (def default-settings {:settings {:zoom 100
-                                  :history {:max-size 20}}
+                                  :history {:max-size 100}}
                        :dictionaries {:selected (->> (db/all-dictionaries db/ds) (mapv :code) (into #{}))}})
 
 (defn save-settings [settings]
@@ -40,8 +45,6 @@
 (comment
   (load-settings))
 
-
-
 (def *state
   (let [settings (load-settings)]
     (atom
@@ -49,7 +52,7 @@
       {:settings (:settings settings)
        :current-view {:translation :translation}
        :title "Sanskrit Dictionaries"
-       :status "Ready!"
+       :status (str "Version: " (:version app-version))
        :selected-tab "translation"
        :dictionaries {:all (db/all-dictionaries db/ds)
                       :selected (-> settings :dictionaries :selected)}
@@ -79,11 +82,11 @@
 
 ;; Event handlers with helpers
 (defn history-conj [{:keys [settings input] :as state}  value]
-  (let [filtered-history (filter (every-pred #(not= (:word %) value) map? #(some? (:word %))) (:history input))
+  (let [filtered-history (filter (every-pred #(not= (:word %) value) map?) (:history input))
         new-history (-> (take (-  (-> settings :history :max-size) 1) filtered-history)
                         (conj {:word value
                                :ts (quot (System/currentTimeMillis) 1000)}))]
-    (assoc-in state [:input :history] (->> new-history (sort-by :ts) reverse))))
+    (assoc-in state [:input :history] (->> new-history (filter map?) (sort-by :ts) reverse))))
 
 (defn new-search! [context word translation similar]
   (-> context
@@ -94,7 +97,7 @@
 
 (defmulti event-handler :event/type)
 
-(defmethod event-handler ::new-search [{:keys [value fx/context] :as data}]
+(defmethod event-handler ::new-search [{:keys [value fx/context]}]
   (timbre/debug ::new-search)
   (let [selected-dicts (-> context :cljfx.context/m :dictionaries :selected)
         translation (db/memoized-lookup value :dict selected-dicts)
@@ -176,23 +179,22 @@
                         :fx/event 166}))
 
 ;; Views
-`(defn component:word-input-combo [value items disabled?]
-   (cond-> {:fx/type :combo-box
-            :editable true
-            :max-width 450
-            :pref-width 350
-            :value value
-            :items (map :word items)
-            :disable disabled?
-            :prompt-text (if-not disabled? "Type and press Enter" "Select at least one dictionary")
-            :on-action {:event/type ::action}}))
+(defn component:word-input-combo [value items disabled?]
+  (cond-> {:fx/type :combo-box
+           :editable true
+           :max-width 450
+           :pref-width 350
+           :value value
+           :items (map :word items)
+           :disable disabled?
+           :prompt-text (if-not disabled? "Type and press Enter" "Select at least one dictionary")
+           :on-action {:event/type ::action}}))
 
 (def ext-with-html
   (fx/make-ext-with-props
    {:html (fx.prop/make
            (fx.mutator/setter #(.loadContent (.getEngine ^WebView %1) %2))
            fx.lifecycle/scalar)}))
-
 
 (defn component:html [html & {:keys [row column zoom]}]
   (cond-> {:fx/type ext-with-html
@@ -202,13 +204,11 @@
     (some? column) (assoc :grid-pane/column column)
     (some? row) (assoc :grid-pane/row row)))
 
-
-(defn count-rows [s]
+(defn count-rows [s & {:keys [max]}]
   (let [paragraphs (str/split s #"\n")
         para-count (count paragraphs)
         long-lines (->> paragraphs (map #(/ (count %) 100)) (filter #(> % 1)) (reduce +) int)]
-    (+ para-count 1)))
-
+    (min (+ para-count 1) (or max 30))))
 
 (defn component:translations [translations]
   (timbre/debug ::component:translation)
@@ -252,7 +252,6 @@
                                      {:text path})}
           :items items}})
 
-
 (defn component:word-list [items & {:keys [row column selection]}]
   {:fx/type list-view
    :items items
@@ -290,7 +289,6 @@
                           :text "Zoom"}
                          (component:zoom-combo zoom)]}]}))
 
-
 (defn every-selected?
   "Takes a set of dictionary codes `selected-dicts` and a list of `dicts` and checks that
   all of the dictionary codes of the dictionaries are present in the set."
@@ -298,7 +296,6 @@
   (let [dicts-codes (->> dicts (map :code) (into #{}))
         intersection (set/intersection selected-dicts dicts-codes)]
     (= intersection dicts-codes)))
-
 
 (defn components:dictionaries-checkboxes:children [dicts]
   (let [all-dicts (:all dicts)
@@ -379,7 +376,25 @@
                        :closable false
                        :content {:fx/type :scroll-pane
                                  :style-class "dictionaries"
-                                 :content (components:dictionaries-checkboxes dicts)}}]}]})
+                                 :content (components:dictionaries-checkboxes dicts)}}
+
+                      {:fx/type :tab
+                       :id "about"
+                       :graphic {:fx/type :label :text "About"}
+                       :closable false
+                       :content {:fx/type :v-box
+                                 :style-class "about"
+                                 :children [{:fx/type :label
+                                             :style-class "about-heading"
+                                             :text app-name}
+                                            {:fx/type :label
+                                             :style-class "about-version"
+                                             :text (str "Version " (:version app-version) " from " app-date)}
+                                            {:fx/type :separator}
+                                            {:fx/type :label
+                                             :style-class "about-text"
+                                             :wrap-text true
+                                             :text app-about-text}]}}]}]})
 
 (comment
   (zoom->% 1 :modifier 1.1))
@@ -389,6 +404,9 @@
     {".root" {:-fx-font-size (zoom->% zoom)}
      ".toolbar" {:-fx-background-color :white}
      ".input" {:-fx-font-weight :bolder}
+     ".about" {:-fx-background-color :white
+               :-fx-padding 5
+               "-heading" {:-fx-font-size (zoom->% zoom :modifier 1.5)}}
      ".translation" {:-fx-background-color :white
                      "-direction" {:-fx-font-size (zoom->% zoom :modifier 1.3)
                                    :-fx-padding [0 0 5 0]}
@@ -435,6 +453,7 @@
                                       {:fx/type :row-constraints
                                        :percent-height 5}] ;; status bar row
                     :children [;; Top row: toolbar (input, dictionaries, zoom)
+
                                (component:top-row :column 0 :row 0 :zoom zoom :input input :disable-input? (empty? (:selected dicts)))
 
                                ;; Middle row: word selector and translation
@@ -442,7 +461,6 @@
 
                                ;; Bottom row
                                (component:statusbar status :column 0 :row 2)]}}}))
-
 
 (def renderer
   (fx/create-renderer
@@ -456,14 +474,12 @@
                                        ;; context from option map to these functions
                                        (fx/fn->lifecycle-with-context %))}))
 
-
 (defn -main [& args]
   (fx/mount-renderer
    *state
    renderer))
 
-
-(-main)
+  (-main)
 
 (comment
 

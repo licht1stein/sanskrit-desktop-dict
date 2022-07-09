@@ -3,6 +3,7 @@
   (:require [org.corfield.build :as bb]
             [clojure.java.shell :refer [sh]]
             [clojure.string :as str]
+            [clojure.edn :as edn]
             [tupelo.misc :as tm]
             [clojure.java.io :as io]))
 
@@ -11,7 +12,7 @@
 (def main 'sanskrit-desktop-dict.core)
 
 (defn current-version []
-  (slurp ".version"))
+  (-> "resources/version.edn" slurp edn/read-string :version))
 
 (defn test "Run the tests." [opts]
   (bb/run-tests opts))
@@ -32,14 +33,14 @@
 (defn version
   "Bumps version in the .version file. Accepts :bump [:major :minor :patch]"
   [{:keys [bump]}]
-  (let [[major minor patch] (map parse-long (str/split (current-version) #"\."))]
-    (->> (case bump
-           :major [(inc major) 0 0]
-           :minor [major (inc minor) 0]
-           :patch [major minor (inc patch)])
-         (str/join ".")
-         print->
-         (spit ".version"))))
+  (let [[major minor patch] (map parse-long (str/split (current-version) #"\."))
+        new-version (->> (case bump
+                           :major [(inc major) 0 0]
+                           :minor [major (inc minor) 0]
+                           :patch [major minor (inc patch)])
+                         (str/join "."))]
+    (->> {:version new-version :date (java.util.Date.)}
+         (spit "resources/version.edn"))))
 
 (defn replace-icon [opts]
   (let [icon-file (io/file "resources/app-icon.icns")]
