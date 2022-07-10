@@ -13,7 +13,8 @@
             [taoensso.timbre :as timbre]
             [sanskrit-desktop-dict.db.core :as db]
             [sanskrit-desktop-dict.helpers :as helpers])
-  (:import [javafx.scene.web WebView])
+  (:import [javafx.scene.web WebView]
+           [javafx.application Platform])
   (:gen-class))
 
 (def app-name "Sanskrit Dictionaries by MB")
@@ -477,6 +478,7 @@
                                        (fx/fn->lifecycle-with-context %))}))
 
 (defn -main [& args]
+  (Platform/setImplicitExit true)
   (fx/mount-renderer
    *state
    renderer))
