@@ -95,7 +95,7 @@
 (defn upload-release [& {:keys [dir]}]
   (let [pkg-files (filter #(.endsWith (.getName %) ".pkg") (file-seq (io/file "target/mac-release")))
         filename (-> pkg-files first .getName)]
-    (println (str "Uploading " filename) "to S3...")
+    (println (str "Uploading " filename) "to S3. Directory " dir "...")
     (s3/put-object :bucket-name bucket-name
                    :key (if dir (str dir "/" filename) filename)
                    :file (str "target/mac-release/" filename))
