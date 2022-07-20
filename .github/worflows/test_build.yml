@@ -1,6 +1,6 @@
 name: Example workflow
 
-on: [push]
+on: push
 
 jobs:
   clojure:
