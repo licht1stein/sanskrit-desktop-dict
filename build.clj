@@ -49,7 +49,8 @@
          (str/join "\n")
          (spit "README.md"))
     (->> {:version new-version :date (java.util.Date.)}
-         (spit "resources/version.edn"))))
+         (spit "resources/version.edn"))
+    (println new-version)))
 
 (comment
   (slurp "README.md"))
@@ -111,12 +112,21 @@
 
 (defn publish-release-mac [& {:keys [mac-version]}]
   (let [token (System/getenv "BOT_TOKEN")
-        channel (parse-long (System/getenv "RELEASE_CHANNEL"))]
+        channel (parse-long (System/getenv "RELEASE_CHANNEL"))
+        url (str "https://mb-sanskrit-desktop-dict.s3.eu-central-1.amazonaws.com/"
+                 mac-version
+                 "/"
+                 (str/replace release-name #" " "+"))]
     (println "Sending release to Telegram...")
-    (t/send-document token channel {:caption (str "Platform: " mac-version "\nVersion: " ver)} (io/file (str "target/mac-release/" release-name)))))
+    (t/send-text token channel {:parse_mode "HTML"}
+                 (str "Platform " mac-version "\nVersion: " ver "\n\n"
+
+                      "<a href=\""
+                      url
+                      "\">Download</a>"))))
 
 (comment
-  (publish-release-mac {}))
+  (publish-release-mac {:mac-version "macos-11"}))
 
 (defn ci-build-package-upload [opts]
   (if (uploaded?)
@@ -124,4 +134,5 @@
     (do
       (ci opts)
       (mac opts)
+      (upload-release opts)
       (publish-release-mac opts))))
