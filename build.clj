@@ -131,7 +131,7 @@
   (publish-release-mac {:mac-version "macos-11"}))
 
 (defn ci-build-package-upload [opts]
-  (if (uploaded?)
+  (if (uploaded? opts)
     (println "This version is already released. Skpping")
     (do
       (ci opts)
