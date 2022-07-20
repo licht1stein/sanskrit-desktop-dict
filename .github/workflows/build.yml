@@ -17,19 +17,25 @@ jobs:
       # https://github.com/marketplace/actions/cached-lfs-checkout
       - name: Checkout code with cached LFS
         uses: nschloe/action-cached-lfs-checkout@v1
-      - name: Prepare java
-        uses: actions/setup-java@v3
-        with:
-          distribution: 'zulu'
-          java-version: '17'
-      - name: Install clojure tools
-        uses: DeLaGuardo/setup-clojure@9.0
-        with:
-           cli: 1.11.1.1149
-      - name: Build uberjar
-        run: clojure -T:build ci
-      - name: Build pkg
-        run: clojure -T:build mac
+      # - name: Prepare java
+      #   uses: actions/setup-java@v3
+      #   with:
+      #     distribution: 'zulu'
+      #     java-version: '17'
+      # - name: Install clojure tools
+      #   uses: DeLaGuardo/setup-clojure@9.0
+      #   with:
+      #      cli: 1.11.1.1149
+      # - name: Build uberjar
+      #   run: clojure -T:build ci
+      # - name: Build pkg
+      #   run: clojure -T:build mac
+      - name: Create dummy file
+        run: |
+          mkdir target/mac-release
+          touch target/mac-release/foo.pkg
+          echo "Hello, world!" > target/mac-release/foo.pkg
+
       - uses: shallwefootball/s3-upload-action@master
         name: Upload S3
         id: S3
