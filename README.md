@@ -1,5 +1,5 @@
 # Sanskrit Dictionaries by MB
-Latest version: 1.1.4
+Latest version: 1.2.0
 
 A Desktop version of [Cologne Digital Sanskrit Dictionaries](https://www.sanskrit-lexicon.uni-koeln.de/)
 
@@ -7,7 +7,7 @@ A Desktop version of [Cologne Digital Sanskrit Dictionaries](https://www.sanskri
 
 Allows searching all 32 dictionaries simultaneously using either devanagari or IAST (the app detects the characters used and does all the transliterations automatically).
 
-The database file is not included in the repo (it's too large).
+The database file is stored using git LFS.
 
 ## Using the app
 
