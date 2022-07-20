@@ -1,6 +1,11 @@
 {:paths ["src" "resources"]
  :deps {org.clojure/clojure {:mvn/version "1.11.1"}
         cljfx/cljfx {:mvn/version "1.7.20"}
+        org.openjfx/javafx-controls {:mvn/version "18.0.1"}
+        org.openjfx/javafx-base {:mvn/version "18.0.1"}
+        org.openjfx/javafx-graphics {:mvn/version "18.0.1"}
+        org.openjfx/javafx-media {:mvn/version "18.0.1"}
+        org.openjfx/javafx-web {:mvn/version "18.0.1"}
         org.clojure/core.cache {:mvn/version "1.0.225"}
         cljfx/css {:mvn/version "1.1.0"}
         hiccup/hiccup {:mvn/version "1.0.5"}
