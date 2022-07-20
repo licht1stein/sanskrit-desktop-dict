@@ -32,6 +32,7 @@ jobs:
       #   run: clojure -T:build mac
       - name: Create dummy file
         run: |
+          mkdir target
           mkdir target/mac-release
           touch target/mac-release/foo.pkg
           echo "Hello, world!" > target/mac-release/foo.pkg
