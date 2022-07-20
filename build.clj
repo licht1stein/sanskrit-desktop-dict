@@ -92,25 +92,14 @@
         release-name (str package-name "-" ver ".pkg")]
     (files release-name)))
 
-(comment
-  (uploaded?)
-  (def a (->> (s3/list-objects :bucket-name bucket-name) :object-summaries (map :key) (into #{})))
-
-  (a "Sanskrit Dictionaries by MB-1.2.0.pkg"))
-
 (defn upload-release [& {:keys [dir]}]
   (let [pkg-files (filter #(.endsWith (.getName %) ".pkg") (file-seq (io/file "target/mac-release")))
         filename (-> pkg-files first .getName)]
     (println (str "Uploading " filename) "to S3...")
     (s3/put-object :bucket-name bucket-name
                    :key (if dir (str dir "/" filename) filename)
-                   :file "deps.edn" #_(str "target/mac-release/" filename))
+                   :file (str "target/mac-release/" filename))
     (println "Uploaded succesfully!")))
-
-(comment
-  (uploaded?)
-  (upload-release :dir "foo")
-  (def pkg-files (filter #(.endsWith (.getName %) ".pkg") (file-seq (io/file "target/mac-release")))))
 
 (defn publish-release []
   (let [filename (uploaded?)
@@ -127,11 +116,3 @@
       (ci opts)
       (mac opts)
       (upload-release opts))))
-
-
-
-
-(comment
-  s3/generate-presigned-url
-
-  (ci-build-package-upload {}))
