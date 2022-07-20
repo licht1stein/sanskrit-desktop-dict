@@ -67,15 +67,15 @@
       (println  (str "Error: uberjar target/" uberjar " not found. Did you forget to run the ci command?\n\nRun before packaging:\nclj -T:build ci\n"))
       (System/exit 1))
     (println (str "Packaging target/" uberjar))
-    #_(sh "jpackage"
-          "--name" package-name
-          "--input" "."
-          "--main-jar" (str "target/" uberjar)
-          "--app-version" ver
-          "--copyright" "Mikhail Beliansky"
-          "--resource-dir" "resources/package/macos"
-          "--mac-package-identifier" "SanskritDictionariesByMB"
-          "--type" "pkg")
+    (sh "jpackage"
+        "--name" package-name
+        "--input" "."
+        "--main-jar" (str "target/" uberjar)
+        "--app-version" ver
+        "--copyright" "Mikhail Beliansky"
+        "--resource-dir" "resources/package/macos"
+        "--mac-package-identifier" "SanskritDictionariesByMB"
+        "--type" "pkg")
     (println "Creating target/mac-release dir")
     (when-not (.exists release-dir) (.mkdir release-dir))
     (println "Moving result to /target")

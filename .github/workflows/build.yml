@@ -9,7 +9,10 @@ on:
 
 jobs:
   build:
-    runs-on: macos-12
+    strategy:
+      matrix:
+        os: [macos-11, macos-12]
+    runs-on: ${{ os }}
     steps:
       # https://github.com/marketplace/actions/cached-lfs-checkout
       - name: Checkout code with cached LFS
@@ -35,3 +38,4 @@ jobs:
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY}}
           aws_bucket: ${{ secrets.AWS_BUCKET }}
           source_dir: 'target/mac-release'
+          destination_dir: ${{ matrix.version }}
