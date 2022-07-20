@@ -86,6 +86,9 @@
     (sh-print "mv" "*.pkg" "target/mac-release")))
 
 (defn upload-release [opts]
+  (println (str "Uploading " uberjar) "to S3...")
   (s3/put-object :bucket-name "mb-sanskrit-desktop-dict"
+                 :region "eu-central-1"
                  :key "deps.edn" ;; uberjar
-                 :file "deps.edn" #_(str "target/mac-release/" uberjar)))
+                 :file "deps.edn" #_(str "target/mac-release/" uberjar))
+  (println "Done uploading."))
