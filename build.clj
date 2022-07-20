@@ -109,10 +109,9 @@
 (defn time+ [seconds]
   (+ (/ (System/nanoTime) 1000) seconds))
 
-(defn publish-release-mac [opts]
+(defn publish-release-mac [& {:keys [mac-version]}]
   (let [token (System/getenv "BOT_TOKEN")
-        channel (parse-long (System/getenv "RELEASE_CHANNEL"))
-        mac-version (System/getenv "MAC_VERSION")]
+        channel (parse-long (System/getenv "RELEASE_CHANNEL"))]
     (println "Sending release to Telegram...")
     (t/send-document token channel {:caption (str "Platform: " mac-version "\nVersion: " ver)} (io/file (str "target/mac-release/" release-name)))))
 
