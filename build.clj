@@ -119,11 +119,13 @@
                  (str/replace release-name #" " "+"))]
     (println "Sending release to Telegram...")
     (t/send-text token channel {:parse_mode "HTML"}
-                 (str "Platform " mac-version "\nVersion: " ver "\n\n"
+                 (str "Platform: " mac-version "\nVersion: " ver "\n\n"
 
                       "<a href=\""
                       url
-                      "\">Download</a>"))))
+                      "\">"
+                      release-name
+                      "</a>"))))
 
 (comment
   (publish-release-mac {:mac-version "macos-11"}))
