@@ -1,5 +1,5 @@
 # Sanskrit Dictionaries by MB
-Latest version: 1.2.0
+Latest version: 1.2.1
 
 A Desktop version of [Cologne Digital Sanskrit Dictionaries](https://www.sanskrit-lexicon.uni-koeln.de/)
 

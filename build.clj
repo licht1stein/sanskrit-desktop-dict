@@ -5,7 +5,10 @@
             [clojure.string :as str]
             [clojure.edn :as edn]
             [tupelo.misc :as tm]
-            [clojure.java.io :as io]))
+            [clojure.java.io :as io]
+            [amazonica.aws.s3 :as s3]
+            [morse.api :as t]
+            [amazonica.aws.s3transfer :as s3t]))
 
 (def package-name "Sanskrit Dictionaries by MB")
 (def lib 'net.clojars.licht1stein/sanskrit-desktop-dict)
@@ -46,7 +49,8 @@
          (str/join "\n")
          (spit "README.md"))
     (->> {:version new-version :date (java.util.Date.)}
-         (spit "resources/version.edn"))))
+         (spit "resources/version.edn"))
+    (println new-version)))
 
 (comment
   (slurp "README.md"))
@@ -57,10 +61,13 @@
       (not= "" (:out res)) (println (:out res))
       (not= "" (:err res)) (println (:err res)))))
 
+(def ver (current-version))
+(def uberjar (str "sanskrit-desktop-dict-" ver ".jar"))
+
 ;; Manual: https://centerkey.com/mac/java/
 (defn mac "Package the Mac application with jpackage" [opts]
   (let [ver (current-version)
-        uberjar (str "sanskrit-desktop-dict-" ver ".jar")
+        release-dir (io/file "target/mac-release")
         uberjar-exists? (.exists (io/file (str "target/" uberjar)))]
     (when-not uberjar-exists?
       (println  (str "Error: uberjar target/" uberjar " not found. Did you forget to run the ci command?\n\nRun before packaging:\nclj -T:build ci\n"))
@@ -75,5 +82,59 @@
         "--resource-dir" "resources/package/macos"
         "--mac-package-identifier" "SanskritDictionariesByMB"
         "--type" "pkg")
+    (println "Creating target/mac-release dir")
+    (when-not (.exists release-dir) (.mkdir release-dir))
     (println "Moving result to /target")
-    (sh-print "mv" "*.pkg" "target/")))
+    (sh-print "mv" "*.pkg" "target/mac-release")))
+
+(def bucket-name "mb-sanskrit-desktop-dict")
+(def release-name  (str (str package-name "-" ver ".pkg")))
+
+(defn uploaded? [& {:keys [dir]}]
+  (let [files (->> (s3/list-objects :bucket-name bucket-name) :object-summaries (map :key) (into #{}))
+        release-name (str (when dir (str dir "/")) (str package-name "-" ver ".pkg"))]
+    (files release-name)))
+
+(comment
+  (uploaded? :dir "macos-11"))
+
+(defn upload-release [& {:keys [dir]}]
+  (let [pkg-files (filter #(.endsWith (.getName %) ".pkg") (file-seq (io/file "target/mac-release")))
+        filename (-> pkg-files first .getName)]
+    (println (str "Uploading " filename) "to S3. Directory " dir "...")
+    (s3/put-object :bucket-name bucket-name
+                   :key (if dir (str dir "/" filename) filename)
+                   :file (str "target/mac-release/" filename))
+    (println "Uploaded succesfully!")))
+
+(defn time+ [seconds]
+  (+ (/ (System/nanoTime) 1000) seconds))
+
+(defn publish-release-mac [& {:keys [mac-version]}]
+  (let [token (System/getenv "BOT_TOKEN")
+        channel (parse-long (System/getenv "RELEASE_CHANNEL"))
+        url (str "https://mb-sanskrit-desktop-dict.s3.eu-central-1.amazonaws.com/"
+                 mac-version
+                 "/"
+                 (str/replace release-name #" " "+"))]
+    (println "Sending release to Telegram...")
+    (t/send-text token channel {:parse_mode "HTML"}
+                 (str "Platform: " mac-version "\nVersion: " ver "\n\n"
+
+                      "<a href=\""
+                      url
+                      "\">"
+                      release-name
+                      "</a>"))))
+
+(comment
+  (publish-release-mac {:mac-version "macos-11"}))
+
+(defn ci-build-package-upload [opts]
+  (if (uploaded?)
+    (println "This version is already released. Skpping")
+    (do
+      (ci opts)
+      (mac opts)
+      (upload-release opts)
+      (publish-release-mac opts))))
