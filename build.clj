@@ -79,4 +79,4 @@
     (println "Creating target/mac-release dir")
     (when-not (.exists release-dir) (.mkdir release-dir))
     (println "Moving result to /target")
-    (sh-print "mv" "target/*.pkg" "target/mac-release")))
+    (sh-print "mv" "*.pkg" "target/mac-release")))
