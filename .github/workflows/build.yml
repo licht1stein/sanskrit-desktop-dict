@@ -1,4 +1,4 @@
-name: CI Build Mac
+name: Build and Release Mac
 
 on:
   push:
@@ -31,6 +31,7 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: eu-central-1
+          MAC_VERSION: ${{ matrix.os }}
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           RELEASE_CHANNEL: ${{ secrets.RELEASE_CHANNEL }}
         run: |

@@ -7,6 +7,7 @@
             [tupelo.misc :as tm]
             [clojure.java.io :as io]
             [amazonica.aws.s3 :as s3]
+            [morse.api :as t]
             [amazonica.aws.s3transfer :as s3t]))
 
 (def package-name "Sanskrit Dictionaries by MB")
@@ -86,11 +87,15 @@
     (sh-print "mv" "*.pkg" "target/mac-release")))
 
 (def bucket-name "mb-sanskrit-desktop-dict")
+(def release-name  (str (str package-name "-" ver ".pkg")))
 
-(defn uploaded? []
+(defn uploaded? [& {:keys [dir]}]
   (let [files (->> (s3/list-objects :bucket-name bucket-name) :object-summaries (map :key) (into #{}))
-        release-name (str package-name "-" ver ".pkg")]
+        release-name (str (when dir (str dir "/")) (str package-name "-" ver ".pkg"))]
     (files release-name)))
+
+(comment
+  (uploaded? :dir "macos-11"))
 
 (defn upload-release [& {:keys [dir]}]
   (let [pkg-files (filter #(.endsWith (.getName %) ".pkg") (file-seq (io/file "target/mac-release")))
@@ -101,13 +106,18 @@
                    :file (str "target/mac-release/" filename))
     (println "Uploaded succesfully!")))
 
-(defn publish-release []
-  (let [filename (uploaded?)
-        url  (-> (s3/generate-presigned-url bucket-name filename 10000) str)]
-    url))
+(defn time+ [seconds]
+  (+ (/ (System/nanoTime) 1000) seconds))
+
+(defn publish-release-mac [opts]
+  (let [token (System/getenv "BOT_TOKEN")
+        channel (parse-long (System/getenv "RELEASE_CHANNEL"))
+        mac-version (System/getenv "MAC_VERSION")]
+    (println "Sending release to Telegram...")
+    (t/send-document token channel {:caption (str "Platform: " mac-version "\nVersion: " ver)} (io/file (str "target/mac-release/" release-name)))))
 
 (comment
-  (publish-release))
+  (publish-release-mac {}))
 
 (defn ci-build-package-upload [opts]
   (if (uploaded?)
@@ -115,4 +125,4 @@
     (do
       (ci opts)
       (mac opts)
-      (upload-release opts))))
+      (publish-release-mac opts))))
