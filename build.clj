@@ -5,7 +5,9 @@
             [clojure.string :as str]
             [clojure.edn :as edn]
             [tupelo.misc :as tm]
-            [clojure.java.io :as io]))
+            [clojure.java.io :as io]
+            [amazonica.aws.s3 :as s3]
+            [amazonica.aws.s3transfer :as s3t]))
 
 (def package-name "Sanskrit Dictionaries by MB")
 (def lib 'net.clojars.licht1stein/sanskrit-desktop-dict)
@@ -57,11 +59,13 @@
       (not= "" (:out res)) (println (:out res))
       (not= "" (:err res)) (println (:err res)))))
 
+(def ver (current-version))
+(def uberjar (str "sanskrit-desktop-dict-" ver ".jar"))
+
 ;; Manual: https://centerkey.com/mac/java/
 (defn mac "Package the Mac application with jpackage" [opts]
   (let [ver (current-version)
         release-dir (io/file "target/mac-release")
-        uberjar (str "sanskrit-desktop-dict-" ver ".jar")
         uberjar-exists? (.exists (io/file (str "target/" uberjar)))]
     (when-not uberjar-exists?
       (println  (str "Error: uberjar target/" uberjar " not found. Did you forget to run the ci command?\n\nRun before packaging:\nclj -T:build ci\n"))
@@ -80,3 +84,8 @@
     (when-not (.exists release-dir) (.mkdir release-dir))
     (println "Moving result to /target")
     (sh-print "mv" "*.pkg" "target/mac-release")))
+
+(defn upload-release [opts]
+  (s3/put-object :bucket-name "mb-sanskrit-desktop-dict"
+                 :key "deps.edn" ;; uberjar
+                 :file "deps.edn" #_(str "target/mac-release/" uberjar)))

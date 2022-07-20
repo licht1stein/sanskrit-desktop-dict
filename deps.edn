@@ -26,7 +26,8 @@
                   ;; since we're building an app uberjar, we do not
                   ;; need deps-deploy for clojars.org deployment:
                   :deps/root "slim"}
-                 tupelo/tupelo {:mvn/version "22.05.24g"}}
+                 tupelo/tupelo {:mvn/version "22.05.24g"}
+                 amazonica/amazonica {:mvn/version "0.3.161"}}
           :ns-default build}
   :test {:extra-paths ["test"]
          :extra-deps {org.clojure/test.check {:mvn/version "1.1.1"}
