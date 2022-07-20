@@ -1,4 +1,4 @@
-name: CI Build Mac
+name: CI Test
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
 
 
 jobs:
-  build:
+  test:
     runs-on: macos-12
     steps:
       # https://github.com/marketplace/actions/cached-lfs-checkout
@@ -23,15 +23,5 @@ jobs:
         uses: DeLaGuardo/setup-clojure@9.0
         with:
            cli: 1.11.1.1149
-      - name: Build uberjar
-        run: clojure -T:build ci
-      - name: Build pkg
-        run: clojure -T:build mac
-      - uses: shallwefootball/s3-upload-action@master
-        name: Upload S3
-        id: S3
-        with:
-          aws_key_id: ${{ secrets.AWS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY}}
-          aws_bucket: ${{ secrets.AWS_BUCKET }}
-          source_dir: 'target/mac-release'
+      - name: Run tests
+        run: clojure -T:build test

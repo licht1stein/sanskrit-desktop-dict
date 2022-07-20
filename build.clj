@@ -60,20 +60,23 @@
 ;; Manual: https://centerkey.com/mac/java/
 (defn mac "Package the Mac application with jpackage" [opts]
   (let [ver (current-version)
+        release-dir (io/file "target/mac-release")
         uberjar (str "sanskrit-desktop-dict-" ver ".jar")
         uberjar-exists? (.exists (io/file (str "target/" uberjar)))]
     (when-not uberjar-exists?
       (println  (str "Error: uberjar target/" uberjar " not found. Did you forget to run the ci command?\n\nRun before packaging:\nclj -T:build ci\n"))
       (System/exit 1))
     (println (str "Packaging target/" uberjar))
-    (sh "jpackage"
-        "--name" package-name
-        "--input" "."
-        "--main-jar" (str "target/" uberjar)
-        "--app-version" ver
-        "--copyright" "Mikhail Beliansky"
-        "--resource-dir" "resources/package/macos"
-        "--mac-package-identifier" "SanskritDictionariesByMB"
-        "--type" "pkg")
+    #_(sh "jpackage"
+          "--name" package-name
+          "--input" "."
+          "--main-jar" (str "target/" uberjar)
+          "--app-version" ver
+          "--copyright" "Mikhail Beliansky"
+          "--resource-dir" "resources/package/macos"
+          "--mac-package-identifier" "SanskritDictionariesByMB"
+          "--type" "pkg")
+    (println "Creating target/mac-release dir")
+    (when-not (.exists release-dir) (.mkdir release-dir))
     (println "Moving result to /target")
-    (sh-print "mv" "*.pkg" "target/")))
+    (sh-print "mv" "target/*.pkg" "target/mac-release")))
