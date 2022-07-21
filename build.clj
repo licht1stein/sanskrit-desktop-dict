@@ -8,6 +8,7 @@
             [clojure.java.io :as io]
             [amazonica.aws.s3 :as s3]
             [morse.api :as t]
+            [blaster.clj-fstring :refer [f-str]]
             [amazonica.aws.s3transfer :as s3t]))
 
 (def package-name "Sanskrit Dictionaries by MB")
@@ -113,21 +114,15 @@
 (defn publish-release-mac [& {:keys [mac-version]}]
   (let [token (System/getenv "BOT_TOKEN")
         channel (parse-long (System/getenv "RELEASE_CHANNEL"))
-        url (str "https://mb-sanskrit-desktop-dict.s3.eu-central-1.amazonaws.com/"
-                 mac-version
-                 "/"
-                 (str/replace release-name #" " "+"))]
+        name (str/replace release-name #" " "+")
+        url (f-str "https://mb-sanskrit-desktop-dict.s3.eu-central-1.amazonaws.com/{mac-version}/{name}")]
     (println "Sending release to Telegram...")
-    (t/send-text token channel {:parse_mode "HTML"}
-                 (str "Platform: " mac-version "\nVersion: " ver "\n\n"
-
-                      "<a href=\""
-                      url
-                      "\">"
-                      release-name
-                      "</a>"))))
+    (t/send-text token channel
+                 {:parse_mode "HTML"}
+                 (f-str "Platform: {mac-version}\nVersion: {ver}\n\n<a href=\"{url}\">{release-name}</a>"))))
 
 (comment
+  (uploaded? :dir "macos-11")
   (publish-release-mac {:mac-version "macos-11"}))
 
 (defn ci-build-package-upload [opts]

@@ -28,7 +28,8 @@
                   :deps/root "slim"}
                  tupelo/tupelo {:mvn/version "22.05.24g"}
                  amazonica/amazonica {:mvn/version "0.3.161"}
-                 morse/morse {:mvn/version "0.4.3"}}
+                 morse/morse {:mvn/version "0.4.3"}
+                 blasterai/clj-fstring {:git/url "https://github.com/Blasterai/clj-fstring.git" :sha "a1c080e13990ce1c0343e3b2f04f0937df96fa3c"}}
           :ns-default build}
   :test {:extra-paths ["test"]
          :extra-deps {org.clojure/test.check {:mvn/version "1.1.1"}
