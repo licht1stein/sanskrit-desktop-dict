@@ -19,6 +19,14 @@ You can download latest version from our [Telegram Channel](https://t.me/sanskri
 
 ## Development
 
+Clone the repo:
+
+    $ git clone https://github.com/licht1stein/sanskrit-desktop-dict
+
+Download the database file:
+
+    $ git lfs pull
+
 Run the project directly, via `:exec-fn`:
 
     $ clojure -X:run-x
