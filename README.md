@@ -21,7 +21,7 @@ You can download latest version from our [Telegram Channel](https://t.me/sanskri
 
 Clone the repo:
 
-    $ git clone https://github.com/licht1stein/sanskrit-desktop-dict
+    $ git clone https://github.com/licht1stein/sanskrit-desktop-dict.git
 
 Download the database file:
 
